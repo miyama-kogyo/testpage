@@ -1359,20 +1359,20 @@
             border-color:#255dcc;
             color:#fff;
         }
-        body.terminal-mode .terminal-new-anomaly-btn {
+        .terminal-new-anomaly-btn {
             border-style:dashed;
             border-color:#6d83b8;
             color:#234fb5;
             background:#f5f8ff;
         }
         .terminal-new-anomaly-form { display:none; }
-        body.terminal-mode .terminal-new-anomaly-form.open {
+        .terminal-new-anomaly-form.open {
             display:grid;
             grid-template-columns:minmax(0,1fr) auto auto;
             gap:8px;
             margin-top:10px;
         }
-        body.terminal-mode .terminal-new-anomaly-form input {
+        .terminal-new-anomaly-form input {
             min-width:0;
             min-height:50px;
             padding:0 12px;
@@ -1384,7 +1384,7 @@
             font-size:16px;
             outline:none;
         }
-        body.terminal-mode .terminal-new-anomaly-form input:focus { border-color:#255dcc; }
+        .terminal-new-anomaly-form input:focus { border-color:#255dcc; }
         .terminal-new-anomaly-action {
             min-height:50px;
             padding:0 14px;
@@ -1481,8 +1481,8 @@
             body.terminal-mode .terminal-insights { margin:8px 0 -88px; padding:18px 14px 30px; }
             .terminal-trend-wrap { height:220px; }
             .terminal-insights-toolbar { align-items:flex-start; flex-direction:column; }
-            body.terminal-mode .terminal-new-anomaly-form { grid-template-columns:1fr 1fr; }
-            body.terminal-mode .terminal-new-anomaly-form input { grid-column:1 / -1; }
+            .terminal-new-anomaly-form { grid-template-columns:1fr 1fr; }
+            .terminal-new-anomaly-form input { grid-column:1 / -1; }
             .qr-master-layout { grid-template-columns:1fr; }
             .qr-preview-pane { min-height:auto; padding:12px; }
             .qr-preview-card { width:min(300px,100%); }
@@ -1586,7 +1586,7 @@
                         <span class="form-label">異常名</span>
                         <div id="anomaly-buttons" class="btn-grid"></div>
                         <div id="terminal-new-anomaly-form" class="terminal-new-anomaly-form">
-                            <input id="terminal-new-anomaly-name" type="text" maxlength="50" placeholder="新しい異常名" onkeydown="if(event.key === 'Enter') saveTerminalNewAnomaly()">
+                            <input id="terminal-new-anomaly-name" class="input-field" type="text" maxlength="50" placeholder="新しい異常名" onkeydown="if(event.key === 'Enter') saveTerminalNewAnomaly()">
                             <button class="terminal-new-anomaly-action" onclick="closeTerminalNewAnomaly()">キャンセル</button>
                             <button id="terminal-new-anomaly-save" class="terminal-new-anomaly-action primary" onclick="saveTerminalNewAnomaly()">追加</button>
                         </div>
@@ -2399,8 +2399,6 @@
                 const sec = document.getElementById('anomaly-section');
                 c.innerHTML = '';
                 const keys = Object.keys(anomalies);
-                const isTerminal = document.body.classList.contains('terminal-mode');
-                if (keys.length === 0 && !isTerminal) { sec.classList.add('hidden'); return; }
                 sec.classList.remove('hidden');
                 keys.forEach(k => {
                     const a = anomalies[k];
@@ -2413,13 +2411,11 @@
                     c.appendChild(b);
                     if (autoSelectId === k) selectAnomaly(a, k, b);
                 });
-                if (isTerminal) {
-                    const addButton = document.createElement('button');
-                    addButton.className = 'sel-btn terminal-new-anomaly-btn';
-                    addButton.textContent = '＋ 新規';
-                    addButton.onclick = openTerminalNewAnomaly;
-                    c.appendChild(addButton);
-                }
+                const addButton = document.createElement('button');
+                addButton.className = 'sel-btn terminal-new-anomaly-btn';
+                addButton.textContent = '＋ 新規';
+                addButton.onclick = openTerminalNewAnomaly;
+                c.appendChild(addButton);
             });
         }
 
@@ -2467,7 +2463,7 @@
         }
 
         function selectAnomaly(anomaly, id, btn) {
-            if (document.body.classList.contains('terminal-mode')) closeTerminalNewAnomaly();
+            closeTerminalNewAnomaly();
             document.querySelectorAll('#anomaly-buttons .sel-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
             selectedAnomaly = { ...anomaly, id };
