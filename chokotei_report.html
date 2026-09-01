@@ -1294,7 +1294,7 @@
         .terminal-option-buttons { display:none; }
 
         body.terminal-mode { overflow:auto; background:#f4f6fb; }
-        body.terminal-mode .app-main { height:auto; min-height:100vh; overflow:visible; }
+        body.terminal-mode .app-main { display:block; height:auto; min-height:100vh; overflow:visible; }
         body.terminal-mode #input-section {
             display:block;
             width:min(100%,720px);
@@ -1376,6 +1376,42 @@
             display:flex !important; align-items:center; justify-content:center;
             width:100%; min-height:60px; margin-top:12px !important; border-radius:6px; font-size:18px;
         }
+        body.terminal-mode .terminal-insights {
+            display:block;
+            margin:8px -14px -96px;
+            padding:20px 14px 34px;
+            border-top:8px solid #f4f6fb;
+            background:#fff;
+        }
+        .terminal-insights-head { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:14px; }
+        .terminal-insights-head h2 { font-size:20px; color:#1a1f3c; }
+        .terminal-insights-head span { font-size:12px; color:var(--text3); }
+        .terminal-kpis { display:grid; grid-template-columns:repeat(3,1fr); margin-bottom:18px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+        .terminal-kpi { padding:13px 8px; text-align:center; border-right:1px solid var(--border); }
+        .terminal-kpi:last-child { border-right:0; }
+        .terminal-kpi strong { display:block; font-family:'Rajdhani',sans-serif; font-size:27px; line-height:1; color:#234fb5; }
+        .terminal-kpi span { display:block; margin-top:5px; font-size:11px; color:var(--text3); }
+        .terminal-insights-toolbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+        .terminal-insights-label { font-size:15px; font-weight:800; color:#313a56; }
+        .terminal-period-buttons { display:flex; gap:6px; }
+        .terminal-period-btn,
+        .terminal-filter-btn {
+            min-height:38px; padding:0 12px; border:1px solid #c8d0ef; border-radius:6px;
+            background:#fff; color:#313a56; font-family:'M PLUS 1',sans-serif; font-size:13px; font-weight:700; cursor:pointer;
+        }
+        .terminal-period-btn.active,
+        .terminal-filter-btn.active { border-color:#255dcc; background:#255dcc; color:#fff; }
+        .terminal-trend-wrap { position:relative; width:100%; height:250px; margin-bottom:18px; }
+        .terminal-filter-buttons { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 18px; }
+        .terminal-filter-btn { min-height:42px; }
+        .terminal-history { border-top:1px solid var(--border); }
+        .terminal-history-item { display:grid; grid-template-columns:92px minmax(0,1fr); gap:10px; padding:13px 2px; border-bottom:1px solid var(--border); }
+        .terminal-history-time { font-size:12px; font-weight:700; color:var(--text3); line-height:1.5; }
+        .terminal-history-main { min-width:0; }
+        .terminal-history-title { font-size:15px; font-weight:800; color:#1a1f3c; }
+        .terminal-history-meta { margin-top:3px; font-size:11px; color:var(--text3); }
+        .terminal-history-note { margin-top:6px; font-size:13px; color:#4a5280; line-height:1.5; word-break:break-word; }
+        .terminal-history-empty { padding:28px 8px; text-align:center; color:var(--text3); font-size:13px; }
 
         .qr-master-layout { display:grid; grid-template-columns:320px minmax(0,1fr); gap:18px; width:100%; }
         .qr-control-pane { display:flex; flex-direction:column; gap:12px; }
@@ -1403,6 +1439,9 @@
             body.terminal-mode .mobile-save-btn {
                 display:none !important;
             }
+            body.terminal-mode .terminal-insights { margin:8px 0 -88px; padding:18px 14px 30px; }
+            .terminal-trend-wrap { height:220px; }
+            .terminal-insights-toolbar { align-items:flex-start; flex-direction:column; }
             .qr-master-layout { grid-template-columns:1fr; }
             .qr-preview-pane { min-height:auto; padding:12px; }
             .qr-preview-card { width:min(300px,100%); }
@@ -1530,6 +1569,38 @@
                     </div>
                 </div>
             </div>
+
+            <section id="terminal-insights" class="terminal-only terminal-insights" aria-label="設備別解析">
+                <div class="terminal-insights-head">
+                    <h2>過去の発生状況</h2>
+                    <span id="terminal-insights-status">履歴を読み込み中</span>
+                </div>
+
+                <div class="terminal-kpis">
+                    <div class="terminal-kpi"><strong id="terminal-today-count">0</strong><span>本日</span></div>
+                    <div class="terminal-kpi"><strong id="terminal-week-count">0</strong><span>直近30日</span></div>
+                    <div class="terminal-kpi"><strong id="terminal-month-count">0</strong><span>累計</span></div>
+                </div>
+
+                <div class="terminal-insights-toolbar">
+                    <span class="terminal-insights-label">異常内容ごとの件数推移</span>
+                    <div class="terminal-period-buttons" aria-label="表示期間">
+                        <button class="terminal-period-btn" onclick="setTerminalInsightsPeriod(30, this)">30日</button>
+                        <button class="terminal-period-btn active" onclick="setTerminalInsightsPeriod(90, this)">90日</button>
+                        <button class="terminal-period-btn" onclick="setTerminalInsightsPeriod(365, this)">1年</button>
+                    </div>
+                </div>
+                <div class="terminal-trend-wrap"><canvas id="terminal-trend-chart"></canvas></div>
+
+                <span class="terminal-insights-label">異常内容で絞り込み</span>
+                <div id="terminal-anomaly-filters" class="terminal-filter-buttons"></div>
+
+                <div class="terminal-insights-toolbar">
+                    <span class="terminal-insights-label">直近の異常履歴</span>
+                    <span id="terminal-history-count" style="font-size:12px;color:var(--text3);"></span>
+                </div>
+                <div id="terminal-history" class="terminal-history"></div>
+            </section>
         </div>
 
         <!-- ===== VIEW SECTION ===== -->
@@ -1967,6 +2038,10 @@
         let currentPeriod = 'day';
         let chart = null;
         let miniChart = null;
+        let terminalInsightsChart = null;
+        let terminalInsightsRecords = [];
+        let terminalInsightsPeriod = 90;
+        let terminalInsightsAnomaly = '';
         let todayAnomalyCounts = {};
         let allRecords = [];
         let currentFilterAnomaly = '';
@@ -2084,6 +2159,7 @@
             todayAnomalyCounts = {};
             loadAnomalyButtons(id);
             loadMiniChart(id, name);
+            loadTerminalInsights(id);
             const today = getLocalDateStr();
             database.ref('records').orderByChild('date').equalTo(today).once('value').then(snap => {
                 todayAnomalyCounts = {};
@@ -2122,6 +2198,151 @@
                 type: 'bar',
                 data: { labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: borderColors, borderWidth: 1.5, borderRadius: 4 }] },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.raw} 件` } } }, scales: { x: { ticks: { color: '#9098bb', font: { size: 10 }, maxRotation: 0 }, grid: { display: false } }, y: { beginAtZero: true, ticks: { color: '#9098bb', stepSize: 1, font: { size: 10 } }, grid: { color: 'rgba(0,0,0,0.05)' } } } }
+            });
+        }
+
+        function getTerminalPeriodStart(days) {
+            const start = new Date();
+            start.setHours(0, 0, 0, 0);
+            start.setDate(start.getDate() - (days - 1));
+            return getLocalDateStr(start);
+        }
+
+        function loadTerminalInsights(equipmentId) {
+            if (!document.body.classList.contains('terminal-mode')) return;
+            const status = document.getElementById('terminal-insights-status');
+            status.textContent = '履歴を読み込み中';
+            database.ref('records').orderByChild('equipmentId').equalTo(equipmentId).once('value').then(snap => {
+                const records = [];
+                snap.forEach(child => records.push({ ...child.val(), _key: child.key }));
+                records.sort((a, b) => String(b.timestamp || `${b.date}T${b.time || ''}`).localeCompare(String(a.timestamp || `${a.date}T${a.time || ''}`)));
+                terminalInsightsRecords = records;
+                if (terminalInsightsAnomaly && !records.some(record => record.anomalyName === terminalInsightsAnomaly)) terminalInsightsAnomaly = '';
+                status.textContent = `${records.length}件の履歴`;
+                renderTerminalKpis();
+                renderTerminalAnomalyFilters();
+                renderTerminalInsights();
+            }).catch(() => {
+                status.textContent = '履歴を読み込めませんでした';
+            });
+        }
+
+        function renderTerminalKpis() {
+            const today = getLocalDateStr();
+            const monthStart = getTerminalPeriodStart(30);
+            document.getElementById('terminal-today-count').textContent = terminalInsightsRecords.filter(record => record.date === today).length;
+            document.getElementById('terminal-week-count').textContent = terminalInsightsRecords.filter(record => record.date >= monthStart).length;
+            document.getElementById('terminal-month-count').textContent = terminalInsightsRecords.length;
+        }
+
+        function renderTerminalAnomalyFilters() {
+            const container = document.getElementById('terminal-anomaly-filters');
+            const counts = {};
+            terminalInsightsRecords.forEach(record => { counts[record.anomalyName] = (counts[record.anomalyName] || 0) + 1; });
+            const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+            container.innerHTML = '';
+            const allButton = document.createElement('button');
+            allButton.className = `terminal-filter-btn${terminalInsightsAnomaly ? '' : ' active'}`;
+            allButton.textContent = `すべて ${terminalInsightsRecords.length}`;
+            allButton.onclick = () => selectTerminalAnomalyFilter('', allButton);
+            container.appendChild(allButton);
+            names.forEach(name => {
+                const button = document.createElement('button');
+                button.className = `terminal-filter-btn${terminalInsightsAnomaly === name ? ' active' : ''}`;
+                button.textContent = `${name} ${counts[name]}`;
+                button.onclick = () => selectTerminalAnomalyFilter(name, button);
+                container.appendChild(button);
+            });
+        }
+
+        function selectTerminalAnomalyFilter(name, button) {
+            terminalInsightsAnomaly = name;
+            document.querySelectorAll('#terminal-anomaly-filters .terminal-filter-btn').forEach(item => item.classList.remove('active'));
+            button.classList.add('active');
+            renderTerminalInsights();
+        }
+
+        function setTerminalInsightsPeriod(days, button) {
+            terminalInsightsPeriod = days;
+            document.querySelectorAll('.terminal-period-btn').forEach(item => item.classList.remove('active'));
+            button.classList.add('active');
+            renderTerminalInsights();
+        }
+
+        function renderTerminalInsights() {
+            const startDate = getTerminalPeriodStart(terminalInsightsPeriod);
+            const periodRecords = terminalInsightsRecords.filter(record => record.date >= startDate && (!terminalInsightsAnomaly || record.anomalyName === terminalInsightsAnomaly));
+            const labels = [];
+            const dateKeys = [];
+            for (let i = terminalInsightsPeriod - 1; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                const key = getLocalDateStr(date);
+                dateKeys.push(key);
+                labels.push(key.slice(5).replace('-', '/'));
+            }
+
+            const periodCounts = {};
+            periodRecords.forEach(record => { periodCounts[record.anomalyName] = (periodCounts[record.anomalyName] || 0) + 1; });
+            const anomalyNames = terminalInsightsAnomaly
+                ? [terminalInsightsAnomaly]
+                : Object.keys(periodCounts).sort((a, b) => periodCounts[b] - periodCounts[a]).slice(0, 6);
+            const datasets = anomalyNames.map((name, index) => ({
+                label: name,
+                data: dateKeys.map(date => periodRecords.filter(record => record.date === date && record.anomalyName === name).length),
+                borderColor: PALETTE[index % PALETTE.length],
+                backgroundColor: PALETTE[index % PALETTE.length] + '22',
+                borderWidth: 2,
+                pointRadius: 2,
+                tension: 0.25,
+                fill: false
+            }));
+
+            if (terminalInsightsChart) terminalInsightsChart.destroy();
+            terminalInsightsChart = new Chart(document.getElementById('terminal-trend-chart').getContext('2d'), {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 }, color: '#4a5280' } } },
+                    scales: {
+                        x: { ticks: { color: '#9098bb', font: { size: 10 }, maxTicksLimit: 8 }, grid: { display: false } },
+                        y: { beginAtZero: true, ticks: { color: '#9098bb', stepSize: 1 }, grid: { color: 'rgba(0,0,0,.06)' } }
+                    }
+                }
+            });
+            renderTerminalHistory(periodRecords);
+        }
+
+        function renderTerminalHistory(records) {
+            const container = document.getElementById('terminal-history');
+            const count = document.getElementById('terminal-history-count');
+            count.textContent = `${records.length}件`;
+            container.innerHTML = '';
+            if (!records.length) {
+                const empty = document.createElement('div');
+                empty.className = 'terminal-history-empty';
+                empty.textContent = 'この期間の異常履歴はありません';
+                container.appendChild(empty);
+                return;
+            }
+            records.slice(0, 20).forEach(record => {
+                const item = document.createElement('article'); item.className = 'terminal-history-item';
+                const time = document.createElement('div'); time.className = 'terminal-history-time';
+                time.textContent = `${record.date || '-'}\n${String(record.time || '').slice(0, 5)}`;
+                time.style.whiteSpace = 'pre-line';
+                const main = document.createElement('div'); main.className = 'terminal-history-main';
+                const title = document.createElement('div'); title.className = 'terminal-history-title'; title.textContent = record.anomalyName || '-';
+                const meta = document.createElement('div'); meta.className = 'terminal-history-meta';
+                meta.textContent = [record.organizationNo, record.operator].filter(Boolean).join(' / ') || '-';
+                main.appendChild(title); main.appendChild(meta);
+                if (record.remarks) {
+                    const note = document.createElement('div'); note.className = 'terminal-history-note'; note.textContent = record.remarks;
+                    main.appendChild(note);
+                }
+                item.appendChild(time); item.appendChild(main); container.appendChild(item);
             });
         }
 
@@ -2236,6 +2457,7 @@
                         loadAnomalyButtons(selectedEquipment);
                     });
                     loadMiniChart(selectedEquipment, selectedEquipmentName);
+                    loadTerminalInsights(selectedEquipment);
                 }
                 resetInputForm();
             }).catch(e => alert('保存失敗: ' + e.message));
