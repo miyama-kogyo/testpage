@@ -1359,20 +1359,24 @@
             border-color:#255dcc;
             color:#fff;
         }
-        .terminal-new-anomaly-btn {
+        .terminal-new-anomaly-btn,
+        .inline-new-master-btn {
             border-style:dashed;
             border-color:#6d83b8;
             color:#234fb5;
             background:#f5f8ff;
         }
-        .terminal-new-anomaly-form { display:none; }
-        .terminal-new-anomaly-form.open {
+        .terminal-new-anomaly-form,
+        .inline-new-master-form { display:none; }
+        .terminal-new-anomaly-form.open,
+        .inline-new-master-form.open {
             display:grid;
             grid-template-columns:minmax(0,1fr) auto auto;
             gap:8px;
             margin-top:10px;
         }
-        .terminal-new-anomaly-form input {
+        .terminal-new-anomaly-form input,
+        .inline-new-master-form input {
             min-width:0;
             min-height:50px;
             padding:0 12px;
@@ -1384,8 +1388,10 @@
             font-size:16px;
             outline:none;
         }
-        .terminal-new-anomaly-form input:focus { border-color:#255dcc; }
-        .terminal-new-anomaly-action {
+        .terminal-new-anomaly-form input:focus,
+        .inline-new-master-form input:focus { border-color:#255dcc; }
+        .terminal-new-anomaly-action,
+        .inline-new-master-action {
             min-height:50px;
             padding:0 14px;
             border:1px solid #c8d0ef;
@@ -1397,7 +1403,8 @@
             font-weight:700;
             cursor:pointer;
         }
-        .terminal-new-anomaly-action.primary { border-color:#255dcc; background:#255dcc; color:#fff; }
+        .terminal-new-anomaly-action.primary,
+        .inline-new-master-action.primary { border-color:#255dcc; background:#255dcc; color:#fff; }
         body.terminal-mode #organization-no-buttons { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
         body.terminal-mode .opt-select-row { display:block; margin-bottom:14px; }
         body.terminal-mode .opt-select-row > label { display:block; margin-bottom:8px; font-size:14px; color:#313a56; }
@@ -1481,8 +1488,10 @@
             body.terminal-mode .terminal-insights { margin:8px 0 -88px; padding:18px 14px 30px; }
             .terminal-trend-wrap { height:220px; }
             .terminal-insights-toolbar { align-items:flex-start; flex-direction:column; }
-            .terminal-new-anomaly-form { grid-template-columns:1fr 1fr; }
-            .terminal-new-anomaly-form input { grid-column:1 / -1; }
+            .terminal-new-anomaly-form,
+            .inline-new-master-form { grid-template-columns:1fr 1fr; }
+            .terminal-new-anomaly-form input,
+            .inline-new-master-form input { grid-column:1 / -1; }
             .qr-master-layout { grid-template-columns:1fr; }
             .qr-preview-pane { min-height:auto; padding:12px; }
             .qr-preview-card { width:min(300px,100%); }
@@ -1561,10 +1570,20 @@
                     <div class="terminal-form-group terminal-operator-group">
                         <span class="form-label">処置者</span>
                         <div id="operator-buttons" class="btn-grid"></div>
+                        <div id="inline-new-operator-form" class="inline-new-master-form">
+                            <input id="inline-new-operator-name" class="input-field" type="text" maxlength="50" placeholder="新しい処置者名" onkeydown="if(event.key === 'Enter') saveInlineOperator()">
+                            <button class="inline-new-master-action" onclick="closeInlineOperator()">キャンセル</button>
+                            <button id="inline-new-operator-save" class="inline-new-master-action primary" onclick="saveInlineOperator()">追加</button>
+                        </div>
                     </div>
                     <div class="terminal-form-group terminal-equipment-group">
-                        <span class="form-label">設備名</span>
+                        <span class="form-label">ライン名 / 設備名</span>
                         <div id="equipment-buttons" class="btn-grid"></div>
+                        <div id="inline-new-equipment-form" class="inline-new-master-form">
+                            <input id="inline-new-equipment-name" class="input-field" type="text" maxlength="50" placeholder="新しいライン名・設備名" onkeydown="if(event.key === 'Enter') saveInlineEquipment()">
+                            <button class="inline-new-master-action" onclick="closeInlineEquipment()">キャンセル</button>
+                            <button id="inline-new-equipment-save" class="inline-new-master-action primary" onclick="saveInlineEquipment()">追加</button>
+                        </div>
                     </div>
                     <div id="input-mini-chart" class="input-mini-chart hidden">
                         <div class="mini-chart-header">
@@ -2143,7 +2162,7 @@
         // ===== INPUT (unchanged) =====
         function loadInputScreen() { loadOperators(); loadEquipments(); }
 
-        function loadOperators() {
+        function loadOperators(autoSelectId) {
             database.ref('masters/operators').once('value', snap => {
                 const ops = snap.val() || {};
                 const c = document.getElementById('operator-buttons');
@@ -2151,11 +2170,15 @@
                 Object.keys(ops).forEach(k => {
                     const b = makeBtn(ops[k].name, () => selectOperator(ops[k].name, b));
                     c.appendChild(b);
+                    if (autoSelectId === k) selectOperator(ops[k].name, b);
                 });
+                const addButton = makeBtn('＋ 新規', openInlineOperator);
+                addButton.classList.add('inline-new-master-btn');
+                c.appendChild(addButton);
             });
         }
 
-        function loadEquipments() {
+        function loadEquipments(autoSelectId) {
             database.ref('masters/equipments').once('value', snap => {
                 const eqs = snap.val() || {};
                 const c = document.getElementById('equipment-buttons');
@@ -2164,7 +2187,11 @@
                     const b = makeBtn(eqs[k].name, () => selectEquipment(eqs[k].name, k, b));
                     b.dataset.equipmentId = k;
                     c.appendChild(b);
+                    if (autoSelectId === k) selectEquipment(eqs[k].name, k, b);
                 });
+                const addButton = makeBtn('＋ 新規', openInlineEquipment);
+                addButton.classList.add('inline-new-master-btn');
+                c.appendChild(addButton);
                 if (pendingEquipmentId) {
                     const equipment = eqs[pendingEquipmentId];
                     const button = [...c.querySelectorAll('.sel-btn')].find(item => item.dataset.equipmentId === pendingEquipmentId);
@@ -2187,12 +2214,14 @@
         }
 
         function selectOperator(name, btn) {
+            closeInlineOperator();
             document.querySelectorAll('#operator-buttons .sel-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
             selectedOperator = name;
         }
 
         function selectEquipment(name, id, btn) {
+            closeInlineEquipment();
             document.querySelectorAll('#equipment-buttons .sel-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
             selectedEquipment = id;
@@ -2244,6 +2273,89 @@
                 type: 'bar',
                 data: { labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: borderColors, borderWidth: 1.5, borderRadius: 4 }] },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.raw} 件` } } }, scales: { x: { ticks: { color: '#9098bb', font: { size: 10 }, maxRotation: 0 }, grid: { display: false } }, y: { beginAtZero: true, ticks: { color: '#9098bb', stepSize: 1, font: { size: 10 } }, grid: { color: 'rgba(0,0,0,0.05)' } } } }
+            });
+        }
+
+        function masterNameExists(items, name) {
+            const normalized = name.trim().toLowerCase();
+            return Object.values(items || {}).some(item => String((item && item.name) || '').trim().toLowerCase() === normalized);
+        }
+
+        function openInlineOperator() {
+            const form = document.getElementById('inline-new-operator-form');
+            const input = document.getElementById('inline-new-operator-name');
+            form.classList.add('open');
+            input.value = '';
+            input.focus();
+        }
+
+        function closeInlineOperator() {
+            document.getElementById('inline-new-operator-form').classList.remove('open');
+            document.getElementById('inline-new-operator-name').value = '';
+        }
+
+        function saveInlineOperator() {
+            const input = document.getElementById('inline-new-operator-name');
+            const saveButton = document.getElementById('inline-new-operator-save');
+            const name = input.value.trim();
+            if (!name) { input.focus(); return; }
+            saveButton.disabled = true;
+            database.ref('masters/operators').once('value').then(snap => {
+                if (masterNameExists(snap.val(), name)) {
+                    alert('同じ処置者名がすでに登録されています');
+                    input.focus();
+                    return null;
+                }
+                const operatorRef = database.ref('masters/operators').push();
+                return operatorRef.set({ name }).then(() => operatorRef.key);
+            }).then(operatorId => {
+                if (!operatorId) return;
+                closeInlineOperator();
+                loadOperators(operatorId);
+                showToast(`✓ ${name} を処置者へ追加しました`);
+            }).catch(error => {
+                alert('処置者を追加できませんでした: ' + error.message);
+            }).finally(() => {
+                saveButton.disabled = false;
+            });
+        }
+
+        function openInlineEquipment() {
+            const form = document.getElementById('inline-new-equipment-form');
+            const input = document.getElementById('inline-new-equipment-name');
+            form.classList.add('open');
+            input.value = '';
+            input.focus();
+        }
+
+        function closeInlineEquipment() {
+            document.getElementById('inline-new-equipment-form').classList.remove('open');
+            document.getElementById('inline-new-equipment-name').value = '';
+        }
+
+        function saveInlineEquipment() {
+            const input = document.getElementById('inline-new-equipment-name');
+            const saveButton = document.getElementById('inline-new-equipment-save');
+            const name = input.value.trim();
+            if (!name) { input.focus(); return; }
+            saveButton.disabled = true;
+            database.ref('masters/equipments').once('value').then(snap => {
+                if (masterNameExists(snap.val(), name)) {
+                    alert('同じライン名・設備名がすでに登録されています');
+                    input.focus();
+                    return null;
+                }
+                const equipmentRef = database.ref('masters/equipments').push();
+                return equipmentRef.set({ name }).then(() => equipmentRef.key);
+            }).then(equipmentId => {
+                if (!equipmentId) return;
+                closeInlineEquipment();
+                loadEquipments(equipmentId);
+                showToast(`✓ ${name} をライン・設備へ追加しました`);
+            }).catch(error => {
+                alert('ライン名・設備名を追加できませんでした: ' + error.message);
+            }).finally(() => {
+                saveButton.disabled = false;
             });
         }
 
@@ -2560,6 +2672,7 @@
 
         function resetInputForm() {
             selectedOperator = null; selectedAnomaly = null; selectedOrganizationNo = null;
+            closeInlineOperator(); closeInlineEquipment(); closeTerminalNewAnomaly();
             document.querySelectorAll('#operator-buttons .sel-btn.selected, #anomaly-buttons .sel-btn.selected, #organization-no-buttons .sel-btn.selected').forEach(b => b.classList.remove('selected'));
             document.getElementById('remarks').value = '';
             document.getElementById('remarks-field').classList.remove('open');
