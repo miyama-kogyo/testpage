@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="0; url=gyomu_nippo_v2.html">
     <title>日報入力</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -67,6 +68,11 @@
         .record-item .task-name { font-weight: 600; font-size: 16px; }
         .record-item .time-range { font-size: 14px; color: #666; margin-top: 4px; }
         .record-item .duration { font-weight: 700; font-size: 18px; }
+        .source-badge { display:inline-block; margin-left:8px; padding:2px 7px; font-size:11px; font-weight:700; border-radius:999px; vertical-align:middle; }
+        .source-badge.pc { background:#dbeafe; color:#1d4ed8; }
+        .source-badge.manual { background:#ecfdf5; color:#047857; }
+        .source-badge.timer { background:#fef3c7; color:#b45309; }
+        .import-note { background:#f8fafc; border-left:4px solid #3b82f6; padding:12px; color:#334155; font-size:13px; line-height:1.6; margin-bottom:14px; }
 
         .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
         .summary-item { background: #f8f9fa; padding: 14px; text-align: center; }
@@ -74,6 +80,24 @@
         .summary-item .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
         .summary-item.total { background: #667eea; }
         .summary-item.total .label, .summary-item.total .value { color: white; }
+
+        .review-panel { background:#f8fafc; border:1px solid #e2e8f0; padding:18px; margin-bottom:22px; }
+        .review-toolbar { display:grid; grid-template-columns: minmax(160px, 1fr) minmax(140px, auto) auto; gap:10px; align-items:center; margin-bottom:16px; }
+        .review-toolbar select { padding:10px; border:2px solid #ddd; font-size:15px; background:white; }
+        .review-range-tabs { display:flex; gap:6px; flex-wrap:wrap; }
+        .review-range-tabs button { padding:10px 14px; border:2px solid #cbd5e1; background:white; color:#475569; cursor:pointer; font-weight:700; font-size:14px; }
+        .review-range-tabs button.active { background:#667eea; border-color:#667eea; color:white; }
+        .review-period { font-size:13px; color:#64748b; margin-bottom:14px; font-weight:600; }
+        .review-empty { text-align:center; color:#888; padding:24px; background:white; border:1px dashed #cbd5e1; }
+        .review-task-table { width:100%; border-collapse:collapse; background:white; margin-top:14px; }
+        .review-task-table th, .review-task-table td { padding:10px 12px; border-bottom:1px solid #e5e7eb; text-align:left; font-size:14px; }
+        .review-task-table th { background:#eef2ff; color:#3730a3; font-weight:700; }
+        .review-task-table td:last-child, .review-task-table th:last-child { text-align:right; }
+        .review-detail-list { margin-top:14px; max-height:260px; overflow-y:auto; background:white; border:1px solid #e5e7eb; }
+        .review-detail-row { display:grid; grid-template-columns:110px 90px 1fr 90px; gap:10px; padding:10px 12px; border-bottom:1px solid #f1f5f9; align-items:center; font-size:14px; }
+        .review-detail-row:last-child { border-bottom:none; }
+        .review-detail-row .task { font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .review-detail-row .hours { text-align:right; font-weight:700; }
 
         .date-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
         .date-nav button { padding: 10px 16px; border: 2px solid #667eea; background: white; color: #667eea; cursor: pointer; font-weight: 600; font-size: 15px; }
@@ -309,6 +333,10 @@
             .case-item { flex-direction: column; align-items: flex-start; }
             .case-item .case-progress { margin-top: 10px; text-align: left; }
             .task-manager-item { grid-template-columns: 1fr; gap: 8px; }
+            .review-toolbar { grid-template-columns: 1fr; }
+            .review-range-tabs button { flex:1; }
+            .review-detail-row { grid-template-columns: 1fr 1fr; }
+            .review-detail-row .task { grid-column: 1 / 2; }
             .modal-content { padding: 16px; }
             .modal-content.wide { width: 98%; }
             .case-detail-header { flex-direction: column; }
@@ -368,6 +396,7 @@
                         <h3 style="margin:0;">📋 タスク <span id="currentMemberName" style="color:#667eea;"></span></h3>
                         <div style="display:flex;gap:6px;">
                             <button class="btn btn-secondary btn-sm" onclick="manualSave()">💾 保存</button>
+                            <button class="btn btn-primary btn-sm" onclick="openPcImportModal()">PC作業取込</button>
                             <button class="btn btn-danger btn-sm" onclick="endWorkToday()">業務終了</button>
                         </div>
                     </div>
@@ -433,6 +462,19 @@
                 <select id="filterMember" onchange="renderHistory()" style="padding:8px;border:2px solid #ddd;"></select>
                 <select id="filterTask" onchange="renderHistory()" style="padding:8px;border:2px solid #ddd;"></select>
             </div>
+            <div class="review-panel">
+                <h4 style="font-size:16px;margin-bottom:12px;color:#334155;">👤 担当者レビュー</h4>
+                <div class="review-toolbar">
+                    <select id="reviewMember" onchange="renderMemberReview()"></select>
+                    <div class="review-range-tabs">
+                        <button id="reviewRangeDay" class="active" onclick="setReviewRange('day')">一日</button>
+                        <button id="reviewRangeWeek" onclick="setReviewRange('week')">週間</button>
+                        <button id="reviewRangeMonth" onclick="setReviewRange('month')">月間</button>
+                    </div>
+                    <button class="btn btn-success" onclick="downloadMemberReviewCsv()">CSV出力</button>
+                </div>
+                <div id="memberReview"></div>
+            </div>
             <div id="historyChart"></div>
             <div class="summary-grid" id="historySummary" style="margin-top:20px;"></div>
             <div id="historyRecords" style="margin-top:15px;"></div>
@@ -468,6 +510,15 @@
                 <input type="text" id="newMember" placeholder="担当者名">
                 <button class="btn btn-primary" onclick="addMember()">追加</button>
             </div>
+        </div>
+        <div class="card">
+            <h3>🏷️ デフォルトタスク</h3>
+            <p style="font-size:12px;color:#666;margin-bottom:10px;">使わない標準タスクは入力ボタンから非表示にできます。過去の実績は残ります。</p>
+            <div class="form-group">
+                <label>担当者</label>
+                <select id="defaultTaskMember" onchange="renderDefaultTasks()"></select>
+            </div>
+            <div id="defaultTaskList"></div>
         </div>
         <div class="card">
             <h3>🏷️ カスタムタスク</h3>
@@ -530,12 +581,38 @@
 <div id="addModal" class="modal">
     <div class="modal-content">
         <h3>記録を追加</h3>
+        <div class="form-group"><label>日付</label><input type="date" id="addDate"></div>
+        <div class="form-group"><label>担当者</label><select id="addMember" onchange="refreshAddTaskOptions()"></select></div>
         <div class="form-group"><label>タスク</label><select id="addTaskName"></select></div>
         <div class="form-group"><label>開始</label><input type="time" id="addStart"></div>
         <div class="form-group"><label>終了</label><input type="time" id="addEnd"></div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeAddModal()">キャンセル</button>
             <button class="btn btn-primary" onclick="addRecord()">追加</button>
+        </div>
+    </div>
+</div>
+
+<!-- PC作業記録取り込みモーダル -->
+<div id="pcImportModal" class="modal">
+    <div class="modal-content">
+        <h3>PC作業記録を取り込む</h3>
+        <div class="import-note">
+            PC作業記録アプリの <strong>out/YYYY-MM-DD_summary.json</strong> を選択、またはJSONを貼り付けてください。<br>
+            同じ日付・担当者のPC自動記録だけを差し替え、手入力のタイムトラッカー記録は残します。
+        </div>
+        <div class="form-group">
+            <label>集計JSONファイル</label>
+            <input type="file" id="pcImportFile" accept=".json,application/json" onchange="loadPcImportFile(event)">
+        </div>
+        <div class="form-group">
+            <label>JSON貼り付け</label>
+            <textarea id="pcImportText" rows="8" oninput="previewPcImportText()" placeholder='{"date":"2026-07-03","member":"杉本","segments":[...]}'></textarea>
+        </div>
+        <div id="pcImportPreview" style="font-size:13px;color:#475569;margin-top:8px;"></div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closePcImportModal()">キャンセル</button>
+            <button class="btn btn-primary" onclick="importPcSummaryFromModal()">取り込む</button>
         </div>
     </div>
 </div>
@@ -595,20 +672,205 @@ const CUSTOM_COLORS = ['#f43f5e','#a855f7','#6366f1','#0ea5e9','#22c55e','#eab30
 const WORK_START_MIN = 8*60, WORK_END_MIN = 17*60;
 const LOCATION_OPTIONS = ['社内', '客先', '物流倉庫', 'その他'];
 
-let members=['担当者1'], customTasks={}, customIcons={}, records=[], activeTimers={}, currentMember=null, editingId=null;
+let members=['担当者1'], customTasks={}, customIcons={}, hiddenDefaultTasksByMember={}, records=[], activeTimers={}, currentMember=null, editingId=null;
 let breakList = [], addRecordDateStr = null;
 let cases = [], newCasePhotos = [], currentCaseFilter = 'all';
 let fs = null, docRef = null, fbUnsubscribe = null, fbConnected = false, fbUpdating = false;
 let localVersion = 0, pendingLocalChanges = false, lastSyncTime = 0, taskList = [];
 let ganttFilterTask = null, ganttDate = null;
+let dailyRecordCache = {};
+let dailyServerBaseline = {}; // date -> array of record ids last known on the server (for safe merge)
+let syncInProgress = false, syncQueued = false;
+let stoppedTimers = {};
+let reviewRange = 'day';
+const STOPPED_TIMER_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function isAbnormalTask(task){ return task === '異常処置' || task === '不具合対応'; }
 function getTaskIcon(task){ return ICONS[task] || customIcons[task] || '📋'; }
 function getTaskColor(task){
     if (COLORS[task]) return COLORS[task];
-    const allCustom = Object.values(customTasks).flat();
-    const idx = allCustom.indexOf(task);
-    return idx >= 0 ? CUSTOM_COLORS[idx % CUSTOM_COLORS.length] : '#667eea';
+    // The member/task list can be reordered by sync. Derive the color from the
+    // task name itself so one task keeps the same color on every render/device.
+    const name = String(task || '');
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = ((hash * 31) + name.charCodeAt(i)) | 0;
+    return CUSTOM_COLORS[(hash >>> 0) % CUSTOM_COLORS.length];
+}
+
+function normalizeHiddenDefaultTasks(value){
+    if (Array.isArray(value)) {
+        const legacyHidden = value.filter(t => DEFAULT_TASKS.includes(t));
+        const converted = {};
+        members.forEach(m => { converted[m] = [...legacyHidden]; });
+        return converted;
+    }
+    const normalized = {};
+    Object.entries(value || {}).forEach(([member, tasks]) => {
+        normalized[member] = Array.isArray(tasks) ? tasks.filter(t => DEFAULT_TASKS.includes(t)) : [];
+    });
+    members.forEach(m => { if (!normalized[m]) normalized[m] = []; });
+    return normalized;
+}
+
+function getHiddenDefaultTasks(member){
+    return hiddenDefaultTasksByMember[member] || [];
+}
+
+function getVisibleDefaultTasks(member){
+    const hidden = getHiddenDefaultTasks(member);
+    return DEFAULT_TASKS.filter(t => !hidden.includes(t));
+}
+
+function getTaskOptionsForMember(member){
+    return [...getVisibleDefaultTasks(member), ...(customTasks[member] || [])];
+}
+
+function parseDateMs(value){
+    const ms = new Date(value || 0).getTime();
+    return Number.isFinite(ms) ? ms : 0;
+}
+function getTimerStartMs(timer){
+    return timer && timer.startTime ? parseDateMs(timer.startTime) : 0;
+}
+function pruneStoppedTimers(){
+    const cutoff = Date.now() - STOPPED_TIMER_TTL_MS;
+    Object.entries(stoppedTimers || {}).forEach(([member, stoppedAt]) => {
+        const stoppedMs = parseDateMs(stoppedAt);
+        if (!stoppedMs || stoppedMs < cutoff) delete stoppedTimers[member];
+    });
+}
+function markTimerStopped(member, stoppedAt){
+    if (!member) return;
+    stoppedTimers[member] = stoppedAt || new Date().toISOString();
+    pruneStoppedTimers();
+}
+function mergeStoppedTimers(serverStoppedTimers){
+    Object.entries(serverStoppedTimers || {}).forEach(([member, stoppedAt]) => {
+        if (parseDateMs(stoppedAt) > parseDateMs(stoppedTimers[member])) {
+            stoppedTimers[member] = stoppedAt;
+        }
+    });
+    pruneStoppedTimers();
+}
+function mergeServerActiveTimers(serverActiveTimers, options){
+    pruneStoppedTimers();
+    const merged = {};
+    Object.entries(serverActiveTimers || {}).forEach(([member, timer]) => {
+        const stoppedMs = parseDateMs(stoppedTimers[member]);
+        const startMs = getTimerStartMs(timer);
+        if (stoppedMs && (!startMs || startMs < stoppedMs)) return;
+        merged[member] = timer;
+    });
+    if (options && options.preserveLocal) {
+        Object.entries(activeTimers || {}).forEach(([member, timer]) => {
+            if (merged[member]) return;
+            const stoppedMs = parseDateMs(stoppedTimers[member]);
+            const startMs = getTimerStartMs(timer);
+            if (!stoppedMs || (startMs && startMs >= stoppedMs)) merged[member] = timer;
+        });
+    }
+    return merged;
+}
+
+function isPcWorkRecord(r){ return r && r.source === 'PCWorkTracker'; }
+function getRecordSource(r){
+    if (!r || !r.source) return 'Manual';
+    return r.source;
+}
+function getRecordSourceLabel(r){
+    if (isPcWorkRecord(r)) return 'PC自動';
+    if (r && r.source === 'TimerTracker') return 'タイマー';
+    return '手動';
+}
+function getRecordSourceClass(r){
+    if (isPcWorkRecord(r)) return 'pc';
+    if (r && r.source === 'TimerTracker') return 'timer';
+    return 'manual';
+}
+function renderSourceBadge(r){
+    return `<span class="source-badge ${getRecordSourceClass(r)}">${getRecordSourceLabel(r)}</span>`;
+}
+
+function getSourcePriority(r){
+    const source = getRecordSource(r);
+    if (source === 'PCWorkTracker') return 1;
+    if (source === 'TimerTracker') return 2;
+    return 3;
+}
+
+function getRecordRange(r){
+    if (!r || !r.startTime || !r.endTime) return null;
+    const start = timeToMinutes(r.startTime), end = timeToMinutes(r.endTime);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+    return { start, end };
+}
+
+function subtractRanges(start, end, blockers){
+    let ranges = [{ start, end }];
+    blockers.forEach(block => {
+        const next = [];
+        ranges.forEach(range => {
+            if (block.end <= range.start || block.start >= range.end) {
+                next.push(range);
+                return;
+            }
+            if (block.start > range.start) next.push({ start: range.start, end: block.start });
+            if (block.end < range.end) next.push({ start: block.end, end: range.end });
+        });
+        ranges = next.filter(r => r.end > r.start);
+    });
+    return ranges;
+}
+
+function normalizeRecordsNoOverlap(){
+    const grouped = {};
+    const passthrough = [];
+    records.forEach((r, index) => {
+        const range = getRecordRange(r);
+        if (!range || !r.member || !r.date) {
+            passthrough.push(r);
+            return;
+        }
+        r.source = getRecordSource(r);
+        const key = `${r.member}|||${r.date}`;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push({ record: r, range, index, priority: getSourcePriority(r) });
+    });
+
+    const normalized = [...passthrough];
+    Object.values(grouped).forEach(items => {
+        const keptForGroup = [];
+        const occupied = [];
+        [3, 2, 1].forEach(priority => {
+            const samePriorityItems = items
+                .filter(item => item.priority === priority)
+                .sort((a,b) => a.range.start - b.range.start || a.range.end - b.range.end || a.index - b.index);
+            const keptThisPriority = [];
+            samePriorityItems.forEach(item => {
+                const ranges = subtractRanges(item.range.start, item.range.end, occupied);
+                ranges.forEach((range, rangeIndex) => {
+                    const rec = { ...item.record };
+                    rec.startTime = minutesToTime(range.start);
+                    rec.endTime = minutesToTime(range.end);
+                    if (rangeIndex > 0) {
+                        rec.id = Date.now() + Math.floor(Math.random() * 1000000) + range.start;
+                    }
+                    keptThisPriority.push({ record: rec, range });
+                });
+            });
+            keptForGroup.push(...keptThisPriority);
+            occupied.push(...keptThisPriority.map(item => item.range));
+            occupied.sort((a,b) => a.start - b.start || a.end - b.end);
+        });
+        normalized.push(...keptForGroup.map(item => item.record));
+    });
+
+    records = normalized.sort((a,b) =>
+        String(a.date || '').localeCompare(String(b.date || '')) ||
+        String(a.member || '').localeCompare(String(b.member || '')) ||
+        String(a.startTime || '').localeCompare(String(b.startTime || '')) ||
+        getSourcePriority(b) - getSourcePriority(a)
+    );
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -636,34 +898,48 @@ function loadData(){
         members = JSON.parse(localStorage.getItem('tt_members') || '["担当者1"]');
         customTasks = JSON.parse(localStorage.getItem('tt_customTasks') || '{}');
         customIcons = JSON.parse(localStorage.getItem('tt_customIcons') || '{}');
+        hiddenDefaultTasksByMember = normalizeHiddenDefaultTasks(JSON.parse(localStorage.getItem('tt_hiddenDefaultTasksByMember') || localStorage.getItem('tt_hiddenDefaultTasks') || '{}'));
         records = JSON.parse(localStorage.getItem('tt_records') || '[]');
         activeTimers = JSON.parse(localStorage.getItem('tt_activeTimers') || '{}');
         taskList = JSON.parse(localStorage.getItem('tt_taskList') || '[]');
         breakList = JSON.parse(localStorage.getItem('tt_breakList') || '[]');
         cases = JSON.parse(localStorage.getItem('tt_cases') || '[]');
+        stoppedTimers = JSON.parse(localStorage.getItem('tt_stoppedTimers') || '{}');
+        pruneStoppedTimers();
         currentMember = JSON.parse(localStorage.getItem('tt_currentMember')) || members[0] || null;
         localVersion = parseInt(localStorage.getItem('tt_version') || '0', 10) || 0;
         lastSyncTime = parseInt(localStorage.getItem('tt_lastSyncTime') || '0', 10) || 0;
+        pendingLocalChanges = localStorage.getItem('tt_pendingLocalChanges') === 'true';
     }catch(e){ console.error('loadData error:', e); }
 }
 
 function saveDataLocal(){
+    // Records are evidence entered by the user. Do not silently trim or remove an
+    // overlapping record during an unrelated save or a background sync.
+    pruneStoppedTimers();
     localStorage.setItem('tt_members', JSON.stringify(members));
     localStorage.setItem('tt_customTasks', JSON.stringify(customTasks));
     localStorage.setItem('tt_customIcons', JSON.stringify(customIcons));
+    hiddenDefaultTasksByMember = normalizeHiddenDefaultTasks(hiddenDefaultTasksByMember);
+    localStorage.setItem('tt_hiddenDefaultTasksByMember', JSON.stringify(hiddenDefaultTasksByMember));
+    localStorage.removeItem('tt_hiddenDefaultTasks');
     localStorage.setItem('tt_records', JSON.stringify(records));
     localStorage.setItem('tt_activeTimers', JSON.stringify(activeTimers));
+    localStorage.setItem('tt_stoppedTimers', JSON.stringify(stoppedTimers));
     localStorage.setItem('tt_taskList', JSON.stringify(taskList));
     localStorage.setItem('tt_breakList', JSON.stringify(breakList));
     localStorage.setItem('tt_cases', JSON.stringify(cases));
     localStorage.setItem('tt_currentMember', JSON.stringify(currentMember));
     localStorage.setItem('tt_version', String(localVersion));
     localStorage.setItem('tt_lastSyncTime', String(lastSyncTime));
+    localStorage.setItem('tt_pendingLocalChanges', String(pendingLocalChanges));
 }
 
 function saveData(){
-    saveDataLocal(); pendingLocalChanges = true;
-    if (!fbUpdating && fbConnected) syncPushToServer();
+    pendingLocalChanges = true;
+    localVersion = localVersion + 1;
+    saveDataLocal();
+    if (!fbUpdating && fbConnected) queueSyncPush();
     updateVersionDisplay();
 }
 
@@ -703,7 +979,7 @@ function renderTaskButtons(){
     const el = document.getElementById('taskButtons'); if (!el) return;
     if (!currentMember){ el.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#888;padding:20px;">担当者を選択</div>'; return; }
     const timer = activeTimers[currentMember];
-    const allTasks = [...DEFAULT_TASKS, ...(customTasks[currentMember] || [])];
+    const allTasks = getTaskOptionsForMember(currentMember);
     el.innerHTML = allTasks.map(t => {
         const active = timer && timer.task === t;
         return `<button class="task-btn ${active?'active':''}" onclick="toggleTask('${t}')"><div class="icon">${getTaskIcon(t)}</div><div>${t}</div>${active?`<div class="elapsed">${getElapsed(timer.startTime)}</div>`:''}</button>`;
@@ -712,6 +988,7 @@ function renderTaskButtons(){
 
 function renderTodayRecords(){
     const today = formatDate(new Date());
+    ensureDailyRecords(today);
     const recs = records.filter(r => r.date === today && r.member === currentMember);
     renderPieChart(recs); renderRecordList('todayRecords','todaySummary',recs,true);
 }
@@ -1045,18 +1322,21 @@ function closePhotoModal(){ document.getElementById('photoModal').classList.remo
 // ===== 履歴 =====
 function renderHistory(){
     const date = document.getElementById('historyDate')?.value || formatDate(new Date());
+    ensureDailyRecords(date);
     const filterMember = document.getElementById('filterMember')?.value || '';
     const filterTask = document.getElementById('filterTask')?.value || '';
     updateHistoryFilters(date);
     let recs = records.filter(r => r.date === date);
     if (filterMember) recs = recs.filter(r => r.member === filterMember);
     if (filterTask) recs = recs.filter(r => r.task === filterTask);
+    renderMemberReview();
     renderHistoryChart(recs,date); renderHistorySummary(recs); renderHistoryRecords(recs,date);
 }
 
 function updateHistoryFilters(date){
     const memberSelect = document.getElementById('filterMember'), taskSelect = document.getElementById('filterTask');
     if (!memberSelect || !taskSelect) return;
+    ensureDailyRecords(date);
     const currentMemberVal = memberSelect.value, currentTaskVal = taskSelect.value;
     memberSelect.innerHTML = '<option value="">全員</option>' + members.map(m=>`<option value="${m}" ${m===currentMemberVal?'selected':''}>${m}</option>`).join('');
     const dayRecs = records.filter(r=>r.date===date);
@@ -1095,9 +1375,127 @@ function renderHistorySummary(recs){
 
 function renderHistoryRecords(recs,date){
     const listEl = document.getElementById('historyRecords'); if (!listEl) return;
-    if (!recs.length){ listEl.innerHTML = ''; return; }
+    const addButton = `<button class="btn btn-secondary" style="width:100%;margin-top:10px;" onclick="openAddModal(null,null,'${date}')">＋ 手入力</button>`;
+    if (!recs.length){ listEl.innerHTML = addButton; return; }
     recs.sort((a,b)=>a.startTime.localeCompare(b.startTime));
-    listEl.innerHTML = '<h4 style="margin-bottom:10px;font-size:13px;color:#555;">📝 詳細記録</h4>' + recs.map(r=>`<div class="record-item" onclick="openEditModal(${r.id})"><div class="color-bar" style="background:${getTaskColor(r.task)}"></div><div class="info"><div class="task-name">${getTaskIcon(r.task)} ${r.task}</div><div class="time-range">${r.startTime} - ${r.endTime} (${r.member})</div></div><div class="duration">${calcHours(r.startTime,r.endTime).toFixed(1)}h</div></div>`).join('');
+    listEl.innerHTML = '<h4 style="margin-bottom:10px;font-size:13px;color:#555;">📝 詳細記録</h4>' + recs.map(r=>`<div class="record-item" onclick="openEditModal(${r.id})"><div class="color-bar" style="background:${getTaskColor(r.task)}"></div><div class="info"><div class="task-name">${getTaskIcon(r.task)} ${r.task}${renderSourceBadge(r)}</div><div class="time-range">${r.startTime} - ${r.endTime} (${r.member})</div></div><div class="duration">${calcHours(r.startTime,r.endTime).toFixed(1)}h</div></div>`).join('') + addButton;
+}
+
+function setReviewRange(range){
+    reviewRange = range;
+    renderMemberReview();
+}
+
+function getReviewRange(baseDate, range){
+    const start = new Date(baseDate + 'T00:00:00');
+    if (Number.isNaN(start.getTime())) return null;
+    const end = new Date(start);
+    if (range === 'week') {
+        const day = start.getDay();
+        const diff = day === 0 ? -6 : 1 - day;
+        start.setDate(start.getDate() + diff);
+        end.setDate(start.getDate() + 6);
+    } else if (range === 'month') {
+        start.setDate(1);
+        end.setMonth(start.getMonth() + 1, 0);
+    }
+    return { start: formatDate(start), end: formatDate(end) };
+}
+
+function getMemberReviewData(){
+    const date = document.getElementById('historyDate')?.value || formatDate(new Date());
+    const range = getReviewRange(date, reviewRange);
+    const member = document.getElementById('reviewMember')?.value || currentMember || members[0] || '';
+    if (!range || !member) return { member, range, recs: [], taskTotals: {}, dayTotals: {}, total: 0 };
+    let cursor = new Date(range.start + 'T00:00:00');
+    const endDate = new Date(range.end + 'T00:00:00');
+    while (cursor <= endDate) {
+        ensureDailyRecords(formatDate(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+    }
+    const recs = records
+        .filter(r => r.member === member && r.date >= range.start && r.date <= range.end)
+        .sort((a,b) => String(a.date).localeCompare(String(b.date)) || String(a.startTime).localeCompare(String(b.startTime)));
+    const taskTotals = {}, dayTotals = {};
+    let total = 0;
+    recs.forEach(r => {
+        const h = calcHours(r.startTime, r.endTime);
+        taskTotals[r.task] = (taskTotals[r.task] || 0) + h;
+        dayTotals[r.date] = (dayTotals[r.date] || 0) + h;
+        total += h;
+    });
+    return { member, range, recs, taskTotals, dayTotals, total };
+}
+
+function renderMemberReview(){
+    const memberSelect = document.getElementById('reviewMember'), panel = document.getElementById('memberReview');
+    if (!memberSelect || !panel) return;
+    const prev = memberSelect.value || currentMember || members[0] || '';
+    memberSelect.innerHTML = members.map(m => `<option value="${m}" ${m===prev?'selected':''}>${m}</option>`).join('');
+    if (members.includes(prev)) memberSelect.value = prev;
+    document.querySelectorAll('[id^="reviewRange"]').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.getElementById('reviewRange' + reviewRange.charAt(0).toUpperCase() + reviewRange.slice(1));
+    if (activeBtn) activeBtn.classList.add('active');
+    const data = getMemberReviewData();
+    if (!data.member) {
+        panel.innerHTML = '<div class="review-empty">担当者を登録してください</div>';
+        return;
+    }
+    const periodLabel = `${data.range.start.replace(/-/g,'/')} - ${data.range.end.replace(/-/g,'/')}`;
+    if (!data.recs.length) {
+        panel.innerHTML = `<div class="review-period">${data.member} / ${periodLabel}</div><div class="review-empty">この期間の実績はありません</div>`;
+        return;
+    }
+    const taskRows = Object.entries(data.taskTotals).sort((a,b)=>b[1]-a[1]).map(([task,h]) => {
+        const pct = data.total ? (h / data.total * 100) : 0;
+        return `<tr><td>${getTaskIcon(task)} ${task}</td><td>${h.toFixed(2)}h</td><td>${pct.toFixed(1)}%</td></tr>`;
+    }).join('');
+    const activeDays = Object.keys(data.dayTotals).length;
+    const avg = activeDays ? data.total / activeDays : 0;
+    const details = data.recs.map(r => `<div class="review-detail-row"><div>${r.date.replace(/-/g,'/')}</div><div>${r.startTime}-${r.endTime}</div><div class="task" title="${r.task}">${getTaskIcon(r.task)} ${r.task}</div><div class="hours">${calcHours(r.startTime,r.endTime).toFixed(2)}h</div></div>`).join('');
+    panel.innerHTML = `
+        <div class="review-period">${data.member} / ${periodLabel}</div>
+        <div class="summary-grid">
+            <div class="summary-item total"><div class="label">合計実績</div><div class="value">${data.total.toFixed(1)}h</div></div>
+            <div class="summary-item"><div class="label">記録件数</div><div class="value">${data.recs.length}</div></div>
+            <div class="summary-item"><div class="label">稼働日平均</div><div class="value">${avg.toFixed(1)}h</div></div>
+        </div>
+        <table class="review-task-table"><thead><tr><th>タスク</th><th>時間</th><th>構成比</th></tr></thead><tbody>${taskRows}</tbody></table>
+        <div class="review-detail-list">${details}</div>
+    `;
+}
+
+function csvCell(value){
+    const text = String(value ?? '');
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g,'""')}"` : text;
+}
+
+function downloadMemberReviewCsv(){
+    const data = getMemberReviewData();
+    if (!data.member) { alert('担当者を選択してください'); return; }
+    if (!data.recs.length) { alert('出力する実績がありません'); return; }
+    const rows = [
+        ['担当者', data.member],
+        ['期間', `${data.range.start} - ${data.range.end}`],
+        ['合計時間(h)', data.total.toFixed(2)],
+        [],
+        ['日付','担当者','タスク','開始','終了','時間(h)','入力元']
+    ];
+    data.recs.forEach(r => rows.push([r.date, r.member, r.task, r.startTime, r.endTime, calcHours(r.startTime,r.endTime).toFixed(2), getRecordSourceLabel(r)]));
+    rows.push([]);
+    rows.push(['タスク別集計']);
+    rows.push(['タスク','時間(h)','構成比(%)']);
+    Object.entries(data.taskTotals).sort((a,b)=>b[1]-a[1]).forEach(([task,h]) => rows.push([task, h.toFixed(2), data.total ? (h / data.total * 100).toFixed(1) : '0.0']));
+    const csv = '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `担当者レビュー_${data.member}_${reviewRange}_${data.range.start}_${data.range.end}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
 }
 
 // ===== ガントチャート =====
@@ -1105,6 +1503,7 @@ function renderGantt(){
     const container = document.getElementById('ganttContainer'), header = document.getElementById('ganttHeader'), body = document.getElementById('ganttBody'), legend = document.getElementById('ganttLegend'), timeDisplay = document.getElementById('ganttCurrentTime'), dateInput = document.getElementById('ganttDate');
     if (!container || !header || !body) return;
     const now = new Date(), todayStr = formatDate(now), target = ganttDate || todayStr;
+    ensureDailyRecords(target);
     if (dateInput && dateInput.value !== target) dateInput.value = target;
     const currentHour = now.getHours(), currentMinute = now.getMinutes();
     if (timeDisplay) timeDisplay.textContent = target===todayStr ? `今: ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}` : target.replace(/-/g,'/');
@@ -1182,7 +1581,7 @@ function renderRecordList(listId,summaryId,recs,showAdd){
     if (!items.length){ listEl.innerHTML = `<div style="text-align:center;color:#888;padding:20px;">記録なし</div>` + (showAdd?`<button class="btn btn-secondary" style="width:100%;margin-top:10px;" onclick="openAddModal()">＋ 手入力</button>`:''); return; }
     items.sort((a,b)=>a.startMin-b.startMin);
     listEl.innerHTML = items.map(item=>{
-        if (item.type==='record'){ const r = item.rec; return `<div class="record-item" onclick="openEditModal(${r.id})"><div class="color-bar" style="background:${getTaskColor(r.task)}"></div><div class="info"><div class="task-name">${getTaskIcon(r.task)} ${r.task}</div><div class="time-range">${r.startTime} - ${r.endTime}</div></div><div class="duration">${calcHours(r.startTime,r.endTime).toFixed(1)}h</div></div>`; }
+        if (item.type==='record'){ const r = item.rec; return `<div class="record-item" onclick="openEditModal(${r.id})"><div class="color-bar" style="background:${getTaskColor(r.task)}"></div><div class="info"><div class="task-name">${getTaskIcon(r.task)} ${r.task}${renderSourceBadge(r)}</div><div class="time-range">${r.startTime} - ${r.endTime}</div></div><div class="duration">${calcHours(r.startTime,r.endTime).toFixed(1)}h</div></div>`; }
         else { return `<div class="record-item" style="opacity:0.9;background:#fff7ed;border:1px dashed #f97316;" onclick="openAddModal('${minutesToTime(item.startMin)}','${minutesToTime(item.endMin)}')"><div class="color-bar" style="background:#f97316"></div><div class="info"><div class="task-name">⚠️ 未入力</div><div class="time-range">${minutesToTime(item.startMin)} - ${minutesToTime(item.endMin)}</div></div><div class="duration">${((item.endMin-item.startMin)/60).toFixed(1)}h</div></div>`; }
     }).join('') + (showAdd?`<button class="btn btn-secondary" style="width:100%;margin-top:10px;" onclick="openAddModal()">＋ 手入力</button>`:'');
 }
@@ -1190,14 +1589,47 @@ function renderRecordList(listId,summaryId,recs,showAdd){
 // ===== 設定 =====
 function renderSettings(){
     const ml = document.getElementById('memberList'); if (ml) ml.innerHTML = members.map(m=>`<div class="setting-item"><span>${m}</span><button class="btn btn-danger btn-sm" onclick="deleteMember('${m}')">削除</button></div>`).join('');
+    const dsel = document.getElementById('defaultTaskMember'); if (dsel){ const v = dsel.value || currentMember; dsel.innerHTML = members.map(m=>`<option value="${m}">${m}</option>`).join(''); dsel.value = members.includes(v) ? v : (currentMember || members[0]); }
     const sel = document.getElementById('customTaskMember'); if (sel){ const v = sel.value; sel.innerHTML = members.map(m=>`<option value="${m}">${m}</option>`).join(''); sel.value = v || members[0]; renderCustomTasks(); }
+    renderDefaultTasks();
     renderBreaks();
+}
+
+function renderDefaultTasks(){
+    const el = document.getElementById('defaultTaskList'); if (!el) return;
+    const member = document.getElementById('defaultTaskMember')?.value || currentMember || members[0];
+    const hiddenTasks = getHiddenDefaultTasks(member);
+    if (!member){ el.innerHTML = '<div style="color:#888;font-size:12px;">担当者を登録してください</div>'; return; }
+    el.innerHTML = DEFAULT_TASKS.map(t => {
+        const hidden = hiddenTasks.includes(t);
+        const btnClass = hidden ? 'btn-secondary' : 'btn-danger';
+        const btnText = hidden ? '復元' : '削除';
+        const action = hidden ? `restoreDefaultTask('${member}','${t}')` : `hideDefaultTask('${member}','${t}')`;
+        return `<div class="setting-item" style="${hidden?'opacity:0.55;':''}"><span>${getTaskIcon(t)} ${t}${hidden?'（非表示）':''}</span><button class="btn ${btnClass} btn-sm" onclick="${action}">${btnText}</button></div>`;
+    }).join('');
 }
 
 function renderCustomTasks(){
     const m = document.getElementById('customTaskMember')?.value, el = document.getElementById('customTaskList'); if (!el || !m) return;
     const tasks = customTasks[m] || [];
     el.innerHTML = tasks.length ? tasks.map(t=>`<div class="setting-item"><span>${t}</span><button class="btn btn-danger btn-sm" onclick="deleteCustomTask('${m}','${t}')">削除</button></div>`).join('') : '<div style="color:#888;font-size:12px;">なし</div>';
+}
+
+function hideDefaultTask(member, task){
+    if (!member) return;
+    if (!DEFAULT_TASKS.includes(task)) return;
+    const isRunning = activeTimers[member] && activeTimers[member].task === task;
+    const message = isRunning ? `${member} は ${task} を実行中です。入力ボタンから非表示にしますか？` : `${member} の ${task} を入力ボタンから削除しますか？`;
+    if (!confirm(message)) return;
+    if (!hiddenDefaultTasksByMember[member]) hiddenDefaultTasksByMember[member] = [];
+    if (!hiddenDefaultTasksByMember[member].includes(task)) hiddenDefaultTasksByMember[member].push(task);
+    saveData(); render(); toast('✓ デフォルトタスクを非表示にしました');
+}
+
+function restoreDefaultTask(member, task){
+    if (!member) return;
+    hiddenDefaultTasksByMember[member] = getHiddenDefaultTasks(member).filter(t => t !== task);
+    saveData(); render(); toast('✓ デフォルトタスクを復元しました');
 }
 
 function renderBreaks(){
@@ -1229,7 +1661,7 @@ function endWorkToday(){
     const gaps=[]; let cursor = WORK_START_MIN;
     merged.forEach(int=>{ if (int.start>cursor) gaps.push({start:cursor,end:int.start}); cursor=Math.max(cursor,int.end); });
     if (cursor<nowMin) gaps.push({start:cursor,end:nowMin});
-    gaps.forEach(g=>{ if (g.end<=g.start) return; records.push({ id:Date.now()+Math.floor(Math.random()*1000), member:currentMember, task:'その他', date:todayStr, startTime:minutesToTime(g.start), endTime:minutesToTime(g.end), autoFilled:true, autoFilledTag:'endWork' }); });
+    gaps.forEach(g=>{ if (g.end<=g.start) return; records.push({ id:createRecordId(), member:currentMember, task:'その他', date:todayStr, startTime:minutesToTime(g.start), endTime:minutesToTime(g.end), source:'Manual', autoFilled:true, autoFilledTag:'endWork' }); });
     saveData(); render(); toast('✓ 業務終了：空白時間を「その他」で登録しました');
 }
 
@@ -1244,15 +1676,20 @@ function updateTimerBar(){
 function toggleTask(task){
     if (!currentMember) return;
     const timer = activeTimers[currentMember];
-    if (timer && timer.task===task){ stopTimer(); return; }
-    if (timer) saveTimerAsRecord(currentMember,timer);
-    activeTimers[currentMember] = {task, startTime:new Date().toISOString()};
+    if (timer && String(timer.task) === String(task)){ stopTimer(); return; }
+    const startAt = new Date().toISOString();
+    if (timer) {
+        saveTimerAsRecord(currentMember,timer);
+        markTimerStopped(currentMember, startAt);
+    }
+    activeTimers[currentMember] = {task, startTime:startAt};
     saveData(); render(); toast(`▶ ${task}`);
 }
 
 function stopTimer(){
     if (!currentMember || !activeTimers[currentMember]) return;
     const saved = saveTimerAsRecord(currentMember,activeTimers[currentMember]);
+    markTimerStopped(currentMember);
     delete activeTimers[currentMember]; saveData(); render();
     toast(saved?'⏹ 停止':'⏹ 停止 (1分未満は記録なし)');
 }
@@ -1260,7 +1697,7 @@ function stopTimer(){
 function saveTimerAsRecord(member,timer){
     const start = new Date(timer.startTime), end=new Date();
     if (end-start<60000) return false;
-    records.push({ id:Date.now(), member, task:timer.task, date:formatDate(start), startTime:formatTime(start), endTime:formatTime(end) });
+    records.push({ id:createRecordId(), member, task:String(timer.task), date:formatDate(start), startTime:formatTime(start), endTime:formatTime(end), source:'TimerTracker' });
     return true;
 }
 
@@ -1285,27 +1722,143 @@ function saveRecord(){
     const r = records.find(x=>x.id===editingId); if (!r) return;
     const s=document.getElementById('editStart').value, e=document.getElementById('editEnd').value;
     if (e<=s){ alert('終了は開始より後に'); return; }
-    r.task=document.getElementById('editTaskName').value; r.startTime=s; r.endTime=e;
+    r.task=document.getElementById('editTaskName').value; r.startTime=s; r.endTime=e; r.source = getRecordSource(r);
     saveData(); closeModal(); render(); toast('✓ 保存');
 }
 function deleteRecord(){ if (!confirm('削除しますか？')) return; records=records.filter(r=>r.id!==editingId); saveData(); closeModal(); render(); toast('🗑 削除'); }
 
-function openAddModal(startOverride,endOverride){
+function openAddModal(startOverride,endOverride,dateOverride){
     if (!currentMember){ alert('担当者を選択'); return; }
-    const tasks=[...DEFAULT_TASKS,...(customTasks[currentMember]||[])];
-    document.getElementById('addTaskName').innerHTML = tasks.map(t=>`<option value="${t}">${t}</option>`).join('');
+    const filterMember = document.getElementById('filterMember')?.value || '';
+    const selectedMember = members.includes(filterMember) ? filterMember : currentMember;
+    const memberSelect = document.getElementById('addMember');
+    if (memberSelect){
+        memberSelect.innerHTML = members.map(m=>`<option value="${m}" ${m===selectedMember?'selected':''}>${m}</option>`).join('');
+    }
+    refreshAddTaskOptions();
     const now=new Date();
     document.getElementById('addStart').value = startOverride || formatTime(new Date(now-3600000));
     document.getElementById('addEnd').value = endOverride || formatTime(now);
-    addRecordDateStr = formatDate(new Date());
+    addRecordDateStr = dateOverride || formatDate(new Date());
+    document.getElementById('addDate').value = addRecordDateStr;
     document.getElementById('addModal').classList.add('show');
+}
+function refreshAddTaskOptions(){
+    const member = document.getElementById('addMember')?.value || currentMember;
+    const tasks=getTaskOptionsForMember(member);
+    document.getElementById('addTaskName').innerHTML = tasks.map(t=>`<option value="${t}">${t}</option>`).join('');
 }
 function closeAddModal(){ document.getElementById('addModal').classList.remove('show'); }
 function addRecord(){
     const t=document.getElementById('addTaskName').value, s=document.getElementById('addStart').value, e=document.getElementById('addEnd').value;
+    const date=document.getElementById('addDate')?.value || addRecordDateStr || formatDate(new Date());
+    const member=document.getElementById('addMember')?.value || currentMember;
+    if (!date){ alert('日付を入力してください'); return; }
+    if (!member){ alert('担当者を選択してください'); return; }
     if (e<=s){ alert('終了は開始より後に'); return; }
-    records.push({ id:Date.now(), member:currentMember, task:t, date:addRecordDateStr||formatDate(new Date()), startTime:s, endTime:e });
+    records.push({ id:createRecordId(), member, task:t, date, startTime:s, endTime:e, source:'Manual' });
     saveData(); closeAddModal(); render(); toast('✓ 追加');
+}
+
+// ===== PC作業記録取り込み =====
+function openPcImportModal(){
+    const textEl = document.getElementById('pcImportText');
+    const previewEl = document.getElementById('pcImportPreview');
+    const fileEl = document.getElementById('pcImportFile');
+    if (textEl) textEl.value = '';
+    if (previewEl) previewEl.textContent = '';
+    if (fileEl) fileEl.value = '';
+    document.getElementById('pcImportModal').classList.add('show');
+}
+
+function closePcImportModal(){ document.getElementById('pcImportModal').classList.remove('show'); }
+
+function loadPcImportFile(event){
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        const textEl = document.getElementById('pcImportText');
+        if (textEl) textEl.value = e.target.result || '';
+        previewPcImportText();
+    };
+    reader.readAsText(file, 'UTF-8');
+}
+
+function previewPcImportText(){
+    const previewEl = document.getElementById('pcImportPreview');
+    const text = document.getElementById('pcImportText')?.value || '';
+    if (!previewEl || !text.trim()) return;
+    try{
+        const summary = JSON.parse(text);
+        const segments = Array.isArray(summary.segments) ? summary.segments : [];
+        const member = summary.member || currentMember || '(担当者未設定)';
+        const date = summary.date || '(日付未設定)';
+        previewEl.textContent = `${date} / ${member} / ${segments.length}件を取り込み予定`;
+    }catch(e){
+        previewEl.textContent = 'JSONを確認できません。形式を見直してください。';
+    }
+}
+
+function importPcSummaryFromModal(){
+    const text = document.getElementById('pcImportText')?.value || '';
+    if (!text.trim()){ alert('PC作業記録のsummary JSONを選択または貼り付けてください'); return; }
+    try{
+        const summary = JSON.parse(text);
+        const result = importPcSummary(summary);
+        closePcImportModal();
+        render();
+        toast(`✓ PC作業記録を取り込みました: ${result.count}件`);
+    }catch(e){
+        alert('取り込みに失敗しました: ' + e.message);
+    }
+}
+
+function ensureTaskForMember(member, task){
+    if (!member || !task || DEFAULT_TASKS.includes(task)) return;
+    if (!customTasks[member]) customTasks[member] = [];
+    if (!customTasks[member].includes(task)) customTasks[member].push(task);
+}
+
+function importPcSummary(summary){
+    if (!summary || !Array.isArray(summary.segments)) throw new Error('segmentsが見つかりません');
+    const member = summary.member || currentMember;
+    const date = summary.date || (summary.segments[0] && summary.segments[0].date);
+    if (!member) throw new Error('担当者がありません');
+    if (!date) throw new Error('日付がありません');
+
+    if (!members.includes(member)) members.push(member);
+    if (!currentMember) currentMember = member;
+
+    const validSegments = summary.segments.filter(seg => seg && seg.task && seg.startTime && seg.endTime && seg.endTime > seg.startTime && seg.task !== '休憩' && seg.sourceType !== 'break');
+    const importedAt = new Date().toISOString();
+    const imported = validSegments.map(seg => {
+        const task = String(seg.task);
+        ensureTaskForMember(member, task);
+        return {
+            id: createRecordId(),
+            member,
+            task,
+            date,
+            startTime: String(seg.startTime),
+            endTime: String(seg.endTime),
+            source: 'PCWorkTracker',
+            sourceType: seg.sourceType || 'PCWork',
+            importedAt,
+            samples: seg.samples || 0,
+            windows: Array.isArray(seg.windows) ? seg.windows.slice(0, 5) : []
+        };
+    });
+
+    records = records.filter(r => !(r.member === member && r.date === date && r.source === 'PCWorkTracker'));
+    records = records.concat(imported);
+    saveData();
+
+    const historyDate = document.getElementById('historyDate');
+    if (historyDate) historyDate.value = date;
+    ganttDate = date;
+
+    return { member, date, count: imported.length };
 }
 
 const AVAILABLE_ICONS = ['📋','📁','💼','🎯','🔔','⭐','💡','🔍','📊','📈','🛠️','⚙️','🔧','🔨','📱','💻','🖥️','📞','📧','📬','📝','✏️','📌','🗂️','📂','🗃️','📅','⏰','🕐','⏱️','🚀','✈️','🚗','🚌','🏭','🏢','🏠','👤','👥','🤝','💬','📢','🔊','🎤','🎧','📷','🎬','🎨','✅','❌','⚠️','❗','❓','💰','💵','🧾','📦','🎁','🛒','🔐','🔑','🌟','🎉'];
@@ -1335,7 +1888,7 @@ function addMember(){
 }
 function deleteMember(m){
     if (!confirm(`${m}を削除？`)) return;
-    members=members.filter(x=>x!==m); delete customTasks[m]; delete activeTimers[m]; records=records.filter(r=>r.member!==m);
+    members=members.filter(x=>x!==m); delete customTasks[m]; delete hiddenDefaultTasksByMember[m]; delete activeTimers[m]; delete stoppedTimers[m]; records=records.filter(r=>r.member!==m);
     if (currentMember===m) currentMember=members[0]||null; saveData(); render(); toast('🗑 削除');
 }
 function addCustomTask(){
@@ -1355,6 +1908,264 @@ function initFirebase(){
     const cfg = JSON.parse(document.getElementById('firebaseConfig').value);
     if (!firebase.apps.length) firebase.initializeApp(cfg);
     fs = firebase.firestore(); docRef = fs.doc('timeTracker/state');
+}
+
+function getDailyDocRef(date){
+    if (!fs || !date) return null;
+    return fs.doc(`timeTracker/state/dailyRecords/${date}`);
+}
+
+function getVisibleDates(){
+    const today = formatDate(new Date());
+    const historyDate = document.getElementById('historyDate')?.value || today;
+    const ganttDateValue = ganttDate || document.getElementById('ganttDate')?.value || today;
+    return [...new Set([today, historyDate, ganttDateValue].filter(Boolean))];
+}
+
+function mergeRecordArrays(date, serverRecords, preserveLocalDeletions){
+    const serverList = Array.isArray(serverRecords) ? serverRecords : [];
+    const localList = getRecordsForDate(date);
+    const merged = new Map();
+    serverList.forEach(r => { if (r && r.id != null) merged.set(String(r.id), r); });
+    localList.forEach(r => { if (r && r.id != null) merged.set(String(r.id), r); });
+    if (preserveLocalDeletions) {
+        const localIds = new Set(localList.filter(r => r && r.id != null).map(r => String(r.id)));
+        (dailyServerBaseline[date] || []).map(String).forEach(id => {
+            if (!localIds.has(id)) merged.delete(id);
+        });
+    }
+    return [...merged.values()].sort((a,b) =>
+        String(a.date || '').localeCompare(String(b.date || '')) ||
+        String(a.member || '').localeCompare(String(b.member || '')) ||
+        String(a.startTime || '').localeCompare(String(b.startTime || ''))
+    );
+}
+
+function setRecordsForDate(date, dayRecords, baselineRecords){
+    const incoming = Array.isArray(dayRecords) ? dayRecords : [];
+    records = records.filter(r => r.date !== date).concat(incoming);
+    dailyRecordCache[date] = { loaded: true, loading: false, recordCount: incoming.length, loadedAt: Date.now() };
+    // Remember which record ids the server had for this date, so a later merge can tell
+    // "deleted locally" apart from "added by another device".
+    const baseline = Array.isArray(baselineRecords) ? baselineRecords : incoming;
+    dailyServerBaseline[date] = baseline.filter(r => r && r.id != null).map(r => String(r.id));
+}
+
+async function loadDailyRecords(date, renderAfter){
+    if (!fbConnected || !fs || !date) return;
+    const cached = dailyRecordCache[date];
+    if (cached && (cached.loaded || cached.loading)) return;
+    dailyRecordCache[date] = { loaded: false, loading: true };
+    try {
+        const snap = await getDailyDocRef(date).get();
+        if (snap.exists) {
+            const data = snap.data() || {};
+            const serverRecords = data.records || [];
+            const mergedRecords = mergeRecordArrays(date, serverRecords, pendingLocalChanges || syncInProgress);
+            setRecordsForDate(date, mergedRecords, serverRecords);
+            saveDataLocal();
+        } else {
+            dailyRecordCache[date] = { loaded: true, loading: false, recordCount: records.filter(r => r.date === date).length, missing: true };
+        }
+        if (renderAfter) render();
+    } catch (e) {
+        console.error('[DailyRecords] load error:', date, e);
+        dailyRecordCache[date] = { loaded: false, loading: false, error: e.message };
+    }
+}
+
+function ensureDailyRecords(date){
+    if (!fbConnected || !fs || !date) return;
+    const cached = dailyRecordCache[date];
+    if (cached && (cached.loaded || cached.loading)) return;
+    loadDailyRecords(date, true);
+}
+
+async function loadVisibleDailyRecords(){
+    if (!fbConnected || !fs) return;
+    await Promise.all(getVisibleDates().map(date => loadDailyRecords(date, false)));
+}
+
+function getRecordDatesForUpload(){
+    // Include dates already known to the device as well. This makes deleting the
+    // last record of a day persist as an empty daily document instead of restoring
+    // the old server copy on the next refresh.
+    return [...new Set([
+        ...records.map(r => r.date),
+        ...Object.keys(dailyRecordCache),
+        ...Object.keys(dailyServerBaseline)
+    ].filter(Boolean))];
+}
+
+function getRecordsForDate(date){
+    return records.filter(r => r.date === date);
+}
+
+function getFirebaseErrorMessage(e){
+    const code = e && e.code ? String(e.code) : '';
+    const message = e && e.message ? String(e.message) : String(e || '');
+    if (code.includes('permission-denied') || message.includes('Missing or insufficient permissions')) {
+        return '権限エラーです。Firestoreルールで timeTracker/state/dailyRecords/{date} の書き込み許可を確認してください。';
+    }
+    if (message.includes('Unsupported field value') || message.includes('undefined')) {
+        return '送信データに未定義の値が含まれていました。データを整えて再送信します。';
+    }
+    if (message === 'CONFLICT') {
+        return '他の端末で更新があります。最新データを取得してから再送信してください。';
+    }
+    return message || '不明なエラー';
+}
+
+function notifySyncError(e, label){
+    const msg = getFirebaseErrorMessage(e);
+    console.error(label || '[Sync] error:', e);
+    updateSyncStatus('disconnected');
+    pendingLocalChanges = true;
+    saveDataLocal();
+    toast(`⚠️ Firebase送信失敗: ${msg}`);
+    return msg;
+}
+
+function queueSyncPush(){
+    if (syncInProgress) { syncQueued = true; return; }
+    syncPushToServer();
+}
+
+function uniqueArray(values){
+    return [...new Set((values || []).filter(v => v != null && v !== ''))];
+}
+
+function mergeCustomTaskMap(serverMap, localMap){
+    const merged = {};
+    const keys = uniqueArray([...Object.keys(serverMap || {}), ...Object.keys(localMap || {})]);
+    keys.forEach(k => { merged[k] = uniqueArray([...((serverMap || {})[k] || []), ...((localMap || {})[k] || [])]); });
+    return merged;
+}
+
+function mergeObjectsById(serverItems, localItems){
+    const merged = new Map();
+    (serverItems || []).forEach(item => { if (item && item.id != null) merged.set(String(item.id), item); });
+    (localItems || []).forEach(item => { if (item && item.id != null) merged.set(String(item.id), item); });
+    return [...merged.values()];
+}
+
+function createRecordId(){
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    return `record_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+}
+
+function shouldUseLegacyRecords(serverData){
+    if (!serverData || !Array.isArray(serverData.records) || !serverData.records.length) return false;
+    // Newer sync stores records in timeTracker/state/dailyRecords/{date}. The old
+    // parent records field may still exist, so only trust it for legacy payloads.
+    return serverData.storageMode !== 'dailyRecords';
+}
+
+function mergeLegacyRecordsFromServer(serverData){
+    if (!shouldUseLegacyRecords(serverData)) return;
+    records = mergeObjectsById(serverData.records, records);
+}
+
+function mergeBreakList(serverBreaks, localBreaks){
+    const merged = new Map();
+    [...(serverBreaks || []), ...(localBreaks || [])].forEach(b => {
+        if (b && b.start && b.end) merged.set(`${b.start}-${b.end}`, b);
+    });
+    return [...merged.values()];
+}
+
+function mergeStateFromServer(serverData, options){
+    const preserveLocal = !!(options && options.preserveLocal);
+    members = uniqueArray([...(serverData.members || ['担当者1']), ...members]);
+    customTasks = mergeCustomTaskMap(serverData.customTasks || {}, customTasks);
+    customIcons = Object.assign({}, serverData.customIcons || {}, customIcons);
+    const serverHiddenDefaults = normalizeHiddenDefaultTasks(serverData.hiddenDefaultTasksByMember || serverData.hiddenDefaultTasks || {});
+    const localHiddenDefaults = normalizeHiddenDefaultTasks(hiddenDefaultTasksByMember || {});
+    hiddenDefaultTasksByMember = normalizeHiddenDefaultTasks(Object.assign({}, serverHiddenDefaults, localHiddenDefaults));
+    mergeStoppedTimers(serverData.stoppedTimers || {});
+    activeTimers = mergeServerActiveTimers(serverData.activeTimers || {}, { preserveLocal });
+    taskList = mergeObjectsById(serverData.taskList || [], taskList || []);
+    breakList = mergeBreakList(serverData.breakList || [], breakList || []);
+    cases = mergeObjectsById(serverData.cases || [], cases || []);
+    if (!currentMember || !members.includes(currentMember)) currentMember = members[0] || null;
+}
+
+function sanitizeForFirestore(value){
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value !== 'object') return value;
+    if (value instanceof Date) return value.toISOString();
+    if (Array.isArray(value)) {
+        return value.map(item => sanitizeForFirestore(item)).filter(item => item !== undefined);
+    }
+    const out = {};
+    Object.entries(value).forEach(([key, item]) => {
+        const sanitized = sanitizeForFirestore(item);
+        if (sanitized !== undefined) out[key] = sanitized;
+    });
+    return out;
+}
+
+function createStatePayload(newVersion, extra){
+    const payload = sanitizeForFirestore(Object.assign({
+        members, customTasks, customIcons, hiddenDefaultTasksByMember, activeTimers, stoppedTimers, taskList, breakList, cases,
+        storageMode: 'dailyRecords',
+        dailyDocumentPathTemplate: 'timeTracker/state/dailyRecords/{date}',
+        lastUpdatedVersion: newVersion,
+        lastUpdatedBy: getDeviceId()
+    }, extra || {}));
+    payload.lastUpdatedAt = firebase.firestore.FieldValue.serverTimestamp();
+    return payload;
+}
+
+function createLegacyStatePayload(newVersion, extra){
+    const payload = sanitizeForFirestore(Object.assign({
+        members, customTasks, customIcons, hiddenDefaultTasksByMember, records, activeTimers, stoppedTimers, taskList, breakList, cases,
+        storageMode: 'legacyRecords',
+        lastUpdatedVersion: newVersion,
+        lastUpdatedBy: getDeviceId()
+    }, extra || {}));
+    payload.lastUpdatedAt = firebase.firestore.FieldValue.serverTimestamp();
+    return payload;
+}
+
+async function writeDailyRecordsForDates(dates, version){
+    if (!fs) return;
+    const uniqueDates = [...new Set((dates || []).filter(Boolean))];
+    if (!uniqueDates.length) return;
+    // Write each date in a transaction that merges by record id, so a concurrent writer
+    // (another device, or the PCWorkTracker importer) is never silently overwritten.
+    for (const date of uniqueDates) {
+        const ref = getDailyDocRef(date);
+        const localRecords = getRecordsForDate(date);
+        const localById = new Map(localRecords.map(r => [String(r.id), r]));
+        const baseline = new Set((dailyServerBaseline[date] || []).map(String));
+        let finalRecords = localRecords;
+        await fs.runTransaction(async tx => {
+            const snap = await tx.get(ref);
+            const serverRecords = (snap.exists && Array.isArray(snap.data().records)) ? snap.data().records : [];
+            const merged = new Map();
+            // 1) start from the latest server state (keeps other devices' additions)
+            serverRecords.forEach(r => { if (r && r.id != null) merged.set(String(r.id), r); });
+            // 2) local additions / edits win for ids this device knows
+            localRecords.forEach(r => { if (r && r.id != null) merged.set(String(r.id), r); });
+            // 3) honor local deletions: ids we had loaded from the server but removed locally
+            baseline.forEach(id => { if (!localById.has(id)) merged.delete(id); });
+            finalRecords = [...merged.values()];
+            const dayPayload = sanitizeForFirestore({
+                date,
+                records: finalRecords,
+                recordCount: finalRecords.length,
+                lastUpdatedVersion: version,
+                lastUpdatedBy: getDeviceId()
+            });
+            dayPayload.lastUpdatedAt = firebase.firestore.FieldValue.serverTimestamp();
+            tx.set(ref, dayPayload, { merge: false });
+        });
+        // reflect the merged result locally (also refreshes the server baseline for this date)
+        setRecordsForDate(date, finalRecords);
+    }
 }
 
 function autoConnectFB(){
@@ -1381,15 +2192,25 @@ function updateSyncStatus(status){
 
 function setupFBListener(){
     if (!docRef) return; if (fbUnsubscribe) fbUnsubscribe();
-    fbUnsubscribe = docRef.onSnapshot(snapshot => {
+    fbUnsubscribe = docRef.onSnapshot(async snapshot => {
         if (!snapshot.exists){ fbUpdating = false; updateSyncStatus('connected'); if (records.length > 0 || members.length > 1 || cases.length > 0) syncPushToServer(); return; }
         const serverData = snapshot.data() || {}, serverVersion = serverData.lastUpdatedVersion || 0;
         if (serverVersion > localVersion) {
+            if (pendingLocalChanges || syncInProgress) {
+                mergeStateFromServer(serverData, { preserveLocal: true });
+                mergeLegacyRecordsFromServer(serverData);
+                localVersion = serverVersion;
+                saveDataLocal();
+                queueSyncPush();
+                updateSyncStatus('syncing');
+                return;
+            }
             fbUpdating = true;
-            members = serverData.members || ['担当者1']; customTasks = serverData.customTasks || {}; customIcons = serverData.customIcons || {};
-            records = serverData.records || []; activeTimers = serverData.activeTimers || {}; taskList = serverData.taskList || [];
-            breakList = serverData.breakList || []; cases = serverData.cases || [];
+            mergeStateFromServer(serverData, { preserveLocal: false });
+            mergeLegacyRecordsFromServer(serverData);
             localVersion = serverVersion; lastSyncTime = Date.now();
+            dailyRecordCache = {};
+            await loadVisibleDailyRecords();
             saveDataLocal(); render(); updateVersionDisplay(); hideConflictBanner(); fbUpdating = false; updateSyncStatus('connected');
         } else { updateSyncStatus('connected'); }
     }, err => { console.error('onSnapshot error:', err); updateSyncStatus('disconnected'); });
@@ -1397,17 +2218,32 @@ function setupFBListener(){
 
 async function syncPushToServer(){
     if (!fbConnected || !docRef || !fs) return; updateSyncStatus('syncing');
+    if (syncInProgress) { syncQueued = true; return; }
+    syncInProgress = true;
     try {
-        await fs.runTransaction(async tx => {
-            const snap = await tx.get(docRef), serverData = snap.exists ? snap.data() : {}, serverVersion = serverData.lastUpdatedVersion || 0;
-            if (serverVersion > localVersion) throw new Error('CONFLICT');
-            const newVersion = Math.max(serverVersion, localVersion) + 1;
-            tx.set(docRef, { members, customTasks, customIcons, records, activeTimers, taskList, breakList, cases, lastUpdatedVersion: newVersion, lastUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(), lastUpdatedBy: getDeviceId() }, { merge: false });
-            localVersion = newVersion; lastSyncTime = Date.now();
-            localStorage.setItem('tt_version', String(localVersion)); localStorage.setItem('tt_lastSyncTime', String(lastSyncTime));
-        });
-        pendingLocalChanges = false; updateSyncStatus('connected'); updateVersionDisplay();
-    } catch (e) { if (e.message === 'CONFLICT') { showConflictBanner(); updateSyncStatus('connected'); } else { console.error('[Sync] Push error:', e); updateSyncStatus('disconnected'); } }
+        const datesToWrite = getRecordDatesForUpload();
+        const snap = await docRef.get(), serverData = snap.exists ? snap.data() : {}, serverVersion = serverData.lastUpdatedVersion || 0;
+        if (serverVersion > localVersion) {
+            mergeStateFromServer(serverData, { preserveLocal: true });
+            mergeLegacyRecordsFromServer(serverData);
+        }
+        const newVersion = Math.max(serverVersion, localVersion) + 1;
+        try {
+            await writeDailyRecordsForDates(datesToWrite, newVersion);
+            await docRef.set(createStatePayload(newVersion), { merge: true });
+        } catch (dailyError) {
+            console.warn('[Sync] dailyRecords write failed, falling back to legacy records payload:', dailyError);
+            await docRef.set(createLegacyStatePayload(newVersion, { fallbackReason: getFirebaseErrorMessage(dailyError) }), { merge: true });
+        }
+        localVersion = newVersion; lastSyncTime = Date.now();
+        pendingLocalChanges = false; saveDataLocal(); updateSyncStatus('connected'); updateVersionDisplay();
+    } catch (e) {
+        if (e.message === 'CONFLICT') { showConflictBanner(); updateSyncStatus('connected'); toast('⚠️ 他の端末で更新があります。最新データを取得してください。'); }
+        else { notifySyncError(e, '[Sync] Push error:'); }
+    } finally {
+        syncInProgress = false;
+        if (syncQueued) { syncQueued = false; setTimeout(queueSyncPush, 0); }
+    }
 }
 
 async function forcePushToServer(){
@@ -1416,11 +2252,17 @@ async function forcePushToServer(){
     updateSyncStatus('syncing');
     try {
         const snap = await docRef.get(), serverData = snap.exists ? snap.data() : {}, newVersion = Math.max(serverData.lastUpdatedVersion || 0, localVersion) + 1;
-        await docRef.set({ members, customTasks, customIcons, records, activeTimers, taskList, breakList, cases, lastUpdatedVersion: newVersion, lastUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(), lastUpdatedBy: getDeviceId(), forcePushed: true });
+        try {
+            await writeDailyRecordsForDates(getRecordDatesForUpload(), newVersion);
+            await docRef.set(createStatePayload(newVersion, { forcePushed: true }), { merge: true });
+        } catch (dailyError) {
+            console.warn('[Sync] dailyRecords force push failed, falling back to legacy records payload:', dailyError);
+            await docRef.set(createLegacyStatePayload(newVersion, { forcePushed: true, fallbackReason: getFirebaseErrorMessage(dailyError) }), { merge: true });
+        }
         localVersion = newVersion; lastSyncTime = Date.now();
-        localStorage.setItem('tt_version', String(localVersion)); localStorage.setItem('tt_lastSyncTime', String(lastSyncTime));
+        pendingLocalChanges = false; saveDataLocal();
         hideConflictBanner(); updateSyncStatus('connected'); updateVersionDisplay(); toast('✓ 強制アップロード完了');
-    } catch (e) { alert('アップロードに失敗しました: ' + e.message); updateSyncStatus('disconnected'); }
+    } catch (e) { alert('アップロードに失敗しました: ' + getFirebaseErrorMessage(e)); notifySyncError(e, '[Sync] Force push error:'); }
 }
 
 function getDeviceId(){ let deviceId = localStorage.getItem('tt_deviceId'); if (!deviceId) { deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9); localStorage.setItem('tt_deviceId', deviceId); } return deviceId; }
@@ -1429,20 +2271,24 @@ function hideConflictBanner(){ const banner = document.getElementById('conflictB
 
 function forceReload(){
     if (!docRef) { location.reload(); return; } updateSyncStatus('syncing');
-    docRef.get().then(snap => {
+    docRef.get().then(async snap => {
         if (!snap.exists) { toast('⚠️ サーバーにデータがありません'); updateSyncStatus('connected'); return; }
         const serverData = snap.data();
-        members = serverData.members || ['担当者1']; customTasks = serverData.customTasks || {}; customIcons = serverData.customIcons || {};
-        records = serverData.records || []; activeTimers = serverData.activeTimers || {}; taskList = serverData.taskList || [];
+        members = serverData.members || ['担当者1']; customTasks = serverData.customTasks || {}; customIcons = serverData.customIcons || {}; hiddenDefaultTasksByMember = normalizeHiddenDefaultTasks(serverData.hiddenDefaultTasksByMember || serverData.hiddenDefaultTasks || {});
+        mergeLegacyRecordsFromServer(serverData);
+        mergeStoppedTimers(serverData.stoppedTimers || {});
+        activeTimers = mergeServerActiveTimers(serverData.activeTimers || {}); taskList = serverData.taskList || [];
         breakList = serverData.breakList || []; cases = serverData.cases || [];
         localVersion = serverData.lastUpdatedVersion || 0; lastSyncTime = Date.now();
+        dailyRecordCache = {};
+        await loadVisibleDailyRecords();
         saveDataLocal(); render(); updateVersionDisplay(); hideConflictBanner(); updateSyncStatus('connected'); toast('✓ 最新データを取得しました');
     }).catch(err => { alert('データ取得に失敗しました: ' + err.message); updateSyncStatus('disconnected'); });
 }
 
 // ===== エクスポート/インポート/削除 =====
 function exportData(){
-    const data = { members, customTasks, customIcons, records, activeTimers, taskList, breakList, cases, version: localVersion, exported: new Date().toISOString(), deviceId: getDeviceId() };
+    const data = { members, customTasks, customIcons, hiddenDefaultTasksByMember, records, activeTimers, stoppedTimers, taskList, breakList, cases, version: localVersion, exported: new Date().toISOString(), deviceId: getDeviceId() };
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})); a.download=`日報入力_${formatDate(new Date())}.json`; a.click(); toast('✓ エクスポート');
 }
 
@@ -1453,8 +2299,8 @@ function importData(){
         reader.onload=ev=>{
             try{
                 const data=JSON.parse(ev.target.result); if (!confirm('上書きしますか？')) return;
-                members = data.members || members; customTasks = data.customTasks || {}; customIcons = data.customIcons || {};
-                records = data.records || []; activeTimers = data.activeTimers || {}; taskList = data.taskList || [];
+                members = data.members || members; customTasks = data.customTasks || {}; customIcons = data.customIcons || {}; hiddenDefaultTasksByMember = normalizeHiddenDefaultTasks(data.hiddenDefaultTasksByMember || data.hiddenDefaultTasks || {});
+                records = data.records || []; activeTimers = data.activeTimers || {}; stoppedTimers = data.stoppedTimers || {}; taskList = data.taskList || [];
                 breakList = data.breakList || []; cases = data.cases || [];
                 localVersion = (data.version || 0) + 1; saveData(); render(); updateVersionDisplay(); toast('✓ インポート');
             }catch(e){ alert('エラー: '+e.message); }
@@ -1466,7 +2312,7 @@ function importData(){
 
 function clearData(){
     if (!confirm('全削除しますか？')) return; if (!confirm('本当に？')) return;
-    members=['担当者1']; customTasks={}; customIcons={}; records=[]; activeTimers={}; taskList=[]; breakList=[]; cases=[];
+    members=['担当者1']; customTasks={}; customIcons={}; hiddenDefaultTasksByMember={}; records=[]; activeTimers={}; stoppedTimers={}; taskList=[]; breakList=[]; cases=[];
     currentMember=members[0]; localVersion = localVersion + 1; saveData(); render(); updateVersionDisplay(); toast('🗑 削除');
 }
 
@@ -1492,11 +2338,12 @@ function completePendingTask(member){
     const m=endTimeInput.match(/^(\d{1,2}):(\d{2})$/); if (!m){ alert('正しい時刻形式で入力してください'); return; }
     const endTime=`${String(parseInt(m[1])).padStart(2,'0')}:${m[2]}`;
     if (endTime<=startTimeStr){ alert('終了時刻は開始時刻より後にしてください'); return; }
-    records.push({ id:Date.now(), member, task:timer.task, date:startDate, startTime:startTimeStr, endTime });
+    records.push({ id:createRecordId(), member, task:timer.task, date:startDate, startTime:startTimeStr, endTime, source:'TimerTracker' });
+    markTimerStopped(member);
     delete activeTimers[member]; saveData(); render(); toast(`✓ ${startDate}の記録を保存しました`);
 }
 
-function discardPendingTask(member){ if (!confirm(`${member}の前日のタスクを破棄しますか？`)) return; delete activeTimers[member]; saveData(); render(); toast('🗑 破棄しました'); }
+function discardPendingTask(member){ if (!confirm(`${member}の前日のタスクを破棄しますか？`)) return; markTimerStopped(member); delete activeTimers[member]; saveData(); render(); toast('🗑 破棄しました'); }
 
 // ===== タスク管理 =====
 function renderTaskManager(){
@@ -1546,3 +2393,4 @@ window.onclick = e=>{ if (e.target.classList.contains('modal')){ closeModal(); c
 </script>
 </body>
 </html>
+

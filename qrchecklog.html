@@ -1,0 +1,2584 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR照合ログビューア</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #f5f7fa;
+      --bg2:      #ffffff;
+      --bg3:      #f0f2f5;
+      --bg4:      #e8eaed;
+      --border:   #e2e6ea;
+      --border2:  #cbd0d8;
+      --text:     #1a202c;
+      --text2:    #4a5568;
+      --text3:    #9aa3b0;
+      --accent:   #0077cc;
+      --accent2:  #005fa3;
+      --ok:       #2e7d32;
+      --ok-bg:    #f0faf0;
+      --ok-dim:   #d4edda;
+      --ng:       #c62828;
+      --ng-bg:    #fff5f5;
+      --ng-dim:   #fde0e0;
+      --dup:      #e65100;
+      --dup-bg:   #fff8f0;
+      --dup-dim:  #ffe0c2;
+      --mono:     'IBM Plex Mono', monospace;
+      --sans:     'IBM Plex Sans JP', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #f0f2f5;
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── ヘッダー ── */
+    .header {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-logo {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: .08em;
+      white-space: nowrap;
+    }
+    .header-logo span { color: var(--text2); font-weight: 400; }
+    .fb-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #444;
+      flex-shrink: 0;
+      transition: background .3s;
+    }
+    .fb-dot.connected { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+    .fb-dot.error     { background: var(--ng); }
+    .fb-status-text {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: var(--mono);
+    }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+    /* ── レイアウト ── */
+    .layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: calc(100vh - 56px);
+    }
+
+    /* ── サイドバー ── */
+    .sidebar {
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      padding: 16px 0;
+      position: sticky;
+      top: 56px;
+      height: calc(100vh - 56px);
+      overflow-y: auto;
+    }
+    .sidebar-section {
+      padding: 0 12px;
+      margin-bottom: 20px;
+    }
+    .sidebar-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      color: var(--text3);
+      text-transform: uppercase;
+      padding: 0 4px;
+      margin-bottom: 8px;
+    }
+    .company-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background .15s;
+      font-size: 13px;
+      color: var(--text2);
+      margin-bottom: 2px;
+    }
+    .company-item:hover { background: var(--bg3); color: var(--text); }
+    .company-item.active {
+      background: rgba(79,195,247,.12);
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .company-item .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--border2);
+      flex-shrink: 0;
+    }
+    .company-item.active .dot { background: var(--accent); }
+    .company-item .cmp-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .company-loading {
+      padding: 12px;
+      font-size: 12px;
+      color: var(--text3);
+      font-family: var(--mono);
+    }
+
+    /* ── メインコンテンツ ── */
+    .main {
+      padding: 24px;
+      max-width: 1100px;
+    }
+
+    /* ── フィルターバー ── */
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 20px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .filter-label {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: var(--mono);
+      white-space: nowrap;
+    }
+    .filter-select, .filter-input {
+      background: #f0f2f5;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-family: var(--mono);
+      outline: none;
+      transition: border-color .2s;
+    }
+    .filter-select:focus, .filter-input:focus { border-color: var(--accent); }
+    .filter-input { width: 140px; }
+    .filter-btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #f7f9fc;
+      color: var(--text2);
+      font-size: 12px;
+      font-family: var(--mono);
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .filter-btn.primary {
+      background: var(--accent2);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .filter-btn.primary:hover { background: var(--accent); }
+    .filter-sep { width: 1px; height: 24px; background: var(--border); margin: 0 2px; }
+
+    /* ── サマリーカード ── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .summary-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .summary-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+    }
+    .summary-card.total::before  { background: var(--accent); }
+    .summary-card.ok::before     { background: var(--ok); }
+    .summary-card.ng::before     { background: var(--ng); }
+    .summary-card.dup::before    { background: var(--dup); }
+    .summary-card.rate::before   { background: #7c3aed; }
+    .summary-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      color: var(--text3);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      font-family: var(--mono);
+    }
+    .summary-value {
+      font-size: 28px;
+      font-weight: 700;
+      font-family: var(--mono);
+      line-height: 1;
+    }
+    .summary-card.total .summary-value  { color: var(--accent); }
+    .summary-card.ok    .summary-value  { color: var(--ok); }
+    .summary-card.ng    .summary-value  { color: var(--ng); }
+    .summary-card.dup   .summary-value  { color: var(--dup); }
+    .summary-card.rate  .summary-value  { color: #7c3aed; }
+    .summary-sub {
+      font-size: 10px;
+      color: var(--text3);
+      margin-top: 4px;
+      font-family: var(--mono);
+    }
+
+    /* ── ログテーブル ── */
+    .table-wrap {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .table-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      font-family: var(--mono);
+    }
+    .table-count {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: var(--mono);
+      background: #f7f9fc;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-family: var(--mono);
+    }
+    thead th {
+      background: #f7f9fc;
+      padding: 9px 14px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      color: var(--text3);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+      cursor: pointer;
+    }
+    tbody tr:hover { background: #eef4fb; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td {
+      padding: 10px 14px;
+      vertical-align: middle;
+      color: var(--text2);
+    }
+    .td-time { color: var(--text3); white-space: nowrap; font-size: 11px; }
+    .td-part { color: var(--text); font-weight: 600; font-size: 13px; }
+    .td-qr   { color: var(--text3); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* 納入先名は長いものがあるので、フィルターバーを押し広げないよう幅を抑える */
+    #filterCustomer { max-width: 240px; }
+
+    .result-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .result-badge.ok  { background: var(--ok-dim);  color: #2e7d32; border: 1px solid #a8d5aa; }
+    .result-badge.ng  { background: var(--ng-dim);  color: #c62828; border: 1px solid #f5a8a8; }
+    .result-badge.dup { background: var(--dup-dim); color: #e65100; border: 1px solid #ffbe8a; }
+
+    .rule-text {
+      font-size: 10px;
+      color: var(--text3);
+      background: #f0f2f5;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .detail-board {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .detail-board-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .detail-board.collapsed .detail-board-header { border-bottom: none; }
+    .detail-board-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      font-family: var(--mono);
+    }
+    .detail-board-sub {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: var(--mono);
+    }
+    .detail-board-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      padding: 8px;
+      border-bottom: 1px solid var(--border);
+      background: #fbfcfe;
+    }
+    .detail-board-toggle {
+      min-width: 96px;
+      justify-content: center;
+    }
+    .detail-board-body {
+      display: block;
+    }
+    .detail-board.collapsed .detail-board-body {
+      display: none;
+    }
+    .master-editor {
+      display: grid;
+      gap: 8px;
+    }
+    .master-row {
+      display: grid;
+      grid-template-columns: 140px 1fr 64px;
+      gap: 8px;
+      align-items: center;
+    }
+    .master-input {
+      width: 100%;
+      background: #f0f2f5;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 7px 9px;
+      font-size: 12px;
+      font-family: var(--mono);
+      outline: none;
+    }
+    .master-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .master-actions .filter-btn { flex: 1; }
+    .detail-session-list {
+      display: grid;
+      gap: 4px;
+      padding: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .detail-session-card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 9px;
+      cursor: pointer;
+      background: #fbfcfe;
+      transition: border-color .15s, background .15s;
+    }
+    .detail-session-card:hover { border-color: var(--accent); background: #f3f9ff; }
+    .detail-session-card.active { border-color: var(--accent); background: #eef7ff; }
+    .detail-session-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+    .detail-session-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text);
+      font-family: var(--mono);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .detail-status {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 9px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .detail-status.done { background: var(--ok-dim); color: var(--ok); border: 1px solid #a8d5aa; }
+    .detail-status.active { background: #e6f2ff; color: var(--accent2); border: 1px solid #b8dafa; }
+    .detail-status.empty { background: var(--bg3); color: var(--text3); border: 1px solid var(--border); }
+    .detail-delete-btn {
+      border: 1px solid #f0b6b6;
+      background: #fff4f4;
+      color: #b42318;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .detail-delete-btn:hover { background: #ffe7e7; border-color: #e47c7c; }
+    .detail-progress-row {
+      display: grid;
+      grid-template-columns: 64px 1fr 46px;
+      gap: 7px;
+      align-items: center;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text2);
+    }
+    .detail-progress-bar {
+      height: 6px;
+      background: var(--bg3);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .detail-progress-fill {
+      height: 100%;
+      width: 0;
+      background: var(--accent);
+    }
+    .detail-session-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 5px;
+      color: var(--text3);
+      font-size: 9px;
+      font-family: var(--mono);
+    }
+    .detail-lines {
+      margin-top: 5px;
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .detail-line-chip {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text2);
+      border-radius: 5px;
+      padding: 2px 5px;
+      font-size: 9px;
+      font-family: var(--mono);
+    }
+    .detail-line-chip.done {
+      background: var(--ok-bg);
+      border-color: #a8d5aa;
+      color: var(--ok);
+    }
+    .detail-line-chip.excluded {
+      background: #f0f2f5;
+      color: var(--text3);
+      text-decoration: line-through;
+      text-decoration-thickness: 2px;
+    }
+    .detail-filter-note {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border: 1px solid #b8dafa;
+      border-radius: 8px;
+      background: #eef7ff;
+      color: var(--accent2);
+      font-size: 12px;
+      font-family: var(--mono);
+    }
+    .detail-filter-note.show { display: flex; }
+
+    .current-work-board {
+      background: #fff;
+      border: 1px solid #b8dafa;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 2px rgba(30, 50, 80, .06);
+    }
+    .current-work-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #eef7ff;
+      border-bottom: 1px solid #d8eafa;
+    }
+    .current-work-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--accent2);
+      font-family: var(--mono);
+    }
+    .current-work-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--ok);
+      font-size: 10px;
+      font-weight: 800;
+      font-family: var(--mono);
+    }
+    .current-work-live::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 0 3px rgba(46, 125, 50, .12);
+    }
+    .current-work-list {
+      display: grid;
+      gap: 6px;
+      padding: 8px;
+    }
+    .current-work-empty {
+      padding: 12px;
+      color: var(--text3);
+      font-size: 12px;
+      font-family: var(--mono);
+      text-align: center;
+      background: #fbfcfe;
+    }
+    .current-work-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: #fbfcfe;
+      cursor: pointer;
+    }
+    .current-work-card:hover {
+      border-color: var(--accent);
+      background: #f3f9ff;
+    }
+    .current-work-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .current-work-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--text);
+      font-family: var(--mono);
+    }
+    .current-work-time {
+      color: var(--text3);
+      font-size: 10px;
+      font-family: var(--mono);
+      white-space: nowrap;
+    }
+
+    /* ── 詳細モーダル ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(30,40,60,.55);
+      z-index: 500;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 14px;
+      padding: 24px;
+      width: 100%;
+      max-width: 600px;
+      max-height: 80vh;
+      overflow-y: auto;
+      animation: modalIn .2s ease;
+    }
+    @keyframes modalIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+    .modal-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .modal-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+      align-items: flex-start;
+    }
+    .modal-key {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: var(--mono);
+      width: 120px;
+      flex-shrink: 0;
+      padding-top: 2px;
+    }
+    .modal-val {
+      font-size: 12px;
+      color: var(--text);
+      font-family: var(--mono);
+      word-break: break-all;
+      flex: 1;
+    }
+    .modal-close {
+      width: 100%;
+      margin-top: 16px;
+      padding: 10px;
+      background: #f7f9fc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text2);
+      font-size: 13px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .modal-close:hover { background: var(--bg4); }
+
+    /* ── 空・ローディング ── */
+    .empty-state {
+      padding: 60px 20px;
+      text-align: center;
+      color: var(--text3);
+    }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .empty-text { font-size: 14px; font-family: var(--mono); }
+    .loading-row td {
+      text-align: center;
+      padding: 40px;
+      color: var(--text3);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    /* ── ページネーション ── */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      font-family: var(--mono);
+      color: var(--text3);
+    }
+    .pagination-btns { display: flex; gap: 6px; }
+    .page-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #f7f9fc;
+      color: var(--text2);
+      font-size: 11px;
+      font-family: var(--mono);
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .page-btn:disabled { opacity: .35; cursor: default; }
+    .page-btn.active { background: var(--accent2); border-color: var(--accent); color: #fff; }
+
+    /* ── スクロールバー ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f0f2f5; }
+    ::-webkit-scrollbar-thumb { background: #c0c8d4; border-radius: 3px; }
+
+    @media (max-width: 768px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+      .summary-grid { grid-template-columns: repeat(3, 1fr); }
+      .main { padding: 16px; }
+      .detail-progress-row { grid-template-columns: 66px 1fr 64px; }
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div class="header">
+  <div class="header-logo">QR<span>/</span>LOG<span> VIEWER</span></div>
+  <div class="fb-dot" id="fbDot"></div>
+  <div class="fb-status-text" id="fbStatusText">接続中...</div>
+  <div class="header-right">
+    <a class="filter-btn" href="order_completion.html" style="text-decoration:none;">完納処理待ち</a>
+    <button class="filter-btn primary" onclick="exportCSV()">📥 CSV出力</button>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- サイドバー：会社一覧 -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">ミヤマ / 仕入先</div>
+      <div id="companyList">
+        <div class="company-loading">接続中...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- メイン -->
+  <div class="main">
+
+    <!-- フィルターバー -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <span class="filter-label">結果</span>
+        <select class="filter-select" id="filterResult" onchange="applyFilter()">
+          <option value="all">すべて</option>
+          <option value="OK">✅ OK</option>
+          <option value="NG">❌ NG（すべて）</option>
+          <option value="NG_MISMATCH">❌ NG（品番違いのみ）</option>
+          <option value="DUP">⚠️ 重複</option>
+        </select>
+      </div>
+      <div class="filter-sep"></div>
+      <div class="filter-group">
+        <span class="filter-label">日付 From</span>
+        <input type="date" class="filter-input" id="filterDateFrom" onchange="applyFilter()">
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">To</span>
+        <input type="date" class="filter-input" id="filterDateTo" onchange="applyFilter()">
+      </div>
+      <div class="filter-sep"></div>
+      <div class="filter-group">
+        <span class="filter-label">品番</span>
+        <input type="text" class="filter-input" id="filterPart" placeholder="検索..." oninput="applyFilter()">
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">枝番</span>
+        <input type="text" class="filter-input" id="filterBranch" inputmode="numeric" maxlength="12" placeholder="例: 0278" oninput="applyFilter()">
+      </div>
+      <div class="filter-sep"></div>
+      <div class="filter-group">
+        <span class="filter-label">作業者</span>
+        <select class="filter-select" id="filterWorker" onchange="applyFilter()">
+          <option value="all">すべて</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">処置者</span>
+        <select class="filter-select" id="filterResolver" onchange="applyFilter()">
+          <option value="all">すべて</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">納入先</span>
+        <select class="filter-select" id="filterCustomer" onchange="applyFilter()">
+          <option value="all">すべて</option>
+        </select>
+      </div>
+      <button class="filter-btn" onclick="resetFilter()">リセット</button>
+      <div class="filter-sep"></div>
+      <div class="filter-group">
+        <span class="filter-label">表示件数</span>
+        <select class="filter-select" id="perPageSelect" onchange="changePerPage()">
+          <option value="50">50件</option>
+          <option value="100" selected>100件</option>
+          <option value="200">200件</option>
+          <option value="500">500件</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- サマリー -->
+    <div class="summary-grid">
+      <div class="summary-card total">
+        <div class="summary-label">TOTAL</div>
+        <div class="summary-value" id="sumTotal">—</div>
+        <div class="summary-sub" id="sumDateRange">—</div>
+      </div>
+      <div class="summary-card ok">
+        <div class="summary-label">OK</div>
+        <div class="summary-value" id="sumOK">—</div>
+      </div>
+      <div class="summary-card ng">
+        <div class="summary-label">NG</div>
+        <div class="summary-value" id="sumNG">—</div>
+      </div>
+      <div class="summary-card dup">
+        <div class="summary-label">DUP</div>
+        <div class="summary-value" id="sumDUP">—</div>
+      </div>
+      <div class="summary-card rate">
+        <div class="summary-label">OK RATE</div>
+        <div class="summary-value" id="sumRate">—</div>
+        <div class="summary-sub">フィルタ適用後</div>
+      </div>
+    </div>
+
+    <div class="current-work-board" id="currentWorkBoard">
+      <div class="current-work-head">
+        <div class="current-work-title">現在作業中の明細</div>
+        <div class="current-work-live" id="currentWorkLive">リアルタイム</div>
+      </div>
+      <div class="current-work-list" id="currentWorkList">
+        <div class="current-work-empty">会社を選択してください</div>
+      </div>
+    </div>
+
+    <!-- テーブル -->
+    <div class="detail-board collapsed" id="detailBoard">
+      <div class="detail-board-header" onclick="toggleDetailBoard()">
+        <div>
+          <div class="detail-board-title">注文明細の進捗</div>
+          <div class="detail-board-sub" id="detailSessionCount">0件</div>
+        </div>
+        <button class="filter-btn detail-board-toggle" id="detailBoardToggle" onclick="toggleDetailBoard(event)">表示</button>
+      </div>
+      <div class="detail-board-body">
+        <div class="detail-board-controls">
+          <select class="filter-select" id="detailSortSelect" onchange="changeOrderSessionSort()">
+            <option value="updated_desc">更新順</option>
+            <option value="customer_asc">顧客順</option>
+            <option value="progress_asc">未完了順</option>
+            <option value="progress_desc">進捗順</option>
+          </select>
+          <select class="filter-select" id="detailCustomerFilter" onchange="changeOrderSessionCustomerFilter()">
+            <option value="all">顧客すべて</option>
+          </select>
+          <button class="filter-btn" onclick="openCustomerMasterModal()">顧客名マスタ</button>
+          <button class="filter-btn" onclick="openPassThroughMasterModal()">除外品番マスタ</button>
+          <button class="filter-btn" onclick="clearOrderSessionFilter()">全ログ表示</button>
+        </div>
+        <div class="detail-session-list" id="detailSessionList">
+          <div class="empty-state" style="padding:24px 12px;">
+            <div class="empty-text">会社を選択してください</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-filter-note" id="detailFilterNote">
+      <span id="detailFilterText">明細セッションで絞り込み中</span>
+      <button class="filter-btn" onclick="clearOrderSessionFilter()">解除</button>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-header">
+        <div class="table-title" id="tableTitle">— ログ</div>
+        <div class="table-count" id="tableCount">0件</div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>日時</th>
+              <th>結果</th>
+              <th>作業者</th>
+              <th>品番</th>
+              <th>QR1（正規化）</th>
+              <th>QR2（正規化）</th>
+              <th>QR1文字数</th>
+              <th>明細</th>
+              <th>ルール</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody">
+            <tr class="loading-row"><td colspan="8">会社を選択してください</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination" style="display:none;">
+        <span id="pageInfo">— / —</span>
+        <div class="pagination-btns" id="pageBtns"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 詳細モーダル -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOnBg(event)">
+  <div class="modal" id="modalPanel">
+    <div class="modal-title" id="modalTitle">照合詳細</div>
+    <div id="modalBody"></div>
+    <button class="modal-close" onclick="closeModal()">✕ 閉じる</button>
+  </div>
+</div>
+
+<script>
+  // ── Firebase 設定（QR照合システムと同じプロジェクト） ──
+  const FIREBASE_CONFIG = {
+    apiKey:      "AIzaSyAOMRoojKv9Hnh3OjVGwYV_k1LBTGOKepY",
+    authDomain:  "miyamaunitec-fb87a.firebaseapp.com",
+    databaseURL: "https://miyamaunitec-fb87a-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId:   "miyamaunitec-fb87a"
+  };
+
+  let database      = null;
+  let allLogs       = [];      // 現在選択中の会社・取得期間のログ
+  let filteredLogs  = [];      // フィルタ後
+  let orderSessions = [];
+  let activeOrderSessionId = '';
+  let orderSessionSort = 'updated_desc';
+  let orderSessionCustomerFilter = 'all';
+  let detailBoardOpen = false;
+  let customerNameMaster = {};
+  let passThroughPartMaster = {};
+  let companies     = [];
+  let activeCompany = null;
+  let currentPage   = 1;
+  let perPage       = 100;
+  let logsRef       = null;
+  let orderSessionsRef = null;
+  let loadedDateRange = '';
+  const DEFAULT_PASS_THROUGH_PART_MASTER = {
+    '400079164-1': ['72612-X1C24-00', '72611-X1C36-00', '72611-X1C37-00', '72612-X1C25-00']
+  };
+
+  // ── 初期化 ──
+  window.addEventListener('DOMContentLoaded', () => {
+    const today = getTodayJst();
+    document.getElementById('filterDateTo').value = today;
+    document.getElementById('filterDateFrom').value = today;
+    initFirebase();
+  });
+
+  function getTodayJst() {
+    return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  }
+
+  function getLogDateRange() {
+    const from = document.getElementById('filterDateFrom').value;
+    const to = document.getElementById('filterDateTo').value;
+    return {
+      key: `${from}/${to}`,
+      start: from ? new Date(from + 'T00:00:00+09:00').toISOString() : '',
+      end: to ? new Date(to + 'T23:59:59.999+09:00').toISOString() : ''
+    };
+  }
+
+  function queryForDateRange(path, field) {
+    const range = getLogDateRange();
+    let query = database.ref(path).orderByChild(field);
+    if (range.start) query = query.startAt(range.start);
+    if (range.end) query = query.endAt(range.end);
+    return query;
+  }
+
+  function reloadDateRange() {
+    detachRealtimeListeners();
+    loadedDateRange = getLogDateRange().key;
+    allLogs = [];
+    filteredLogs = [];
+    orderSessions = [];
+    currentPage = 1;
+    renderOrderSessions();
+    applyFilter(false);
+    loadLogs(activeCompany.id);
+    loadOrderSessions(activeCompany.id);
+  }
+
+  function initFirebase() {
+    try {
+      const app = firebase.initializeApp(FIREBASE_CONFIG);
+      database = firebase.database();
+      database.ref('.info/connected').on('value', snap => {
+        const on = snap.val() === true;
+        document.getElementById('fbDot').className = 'fb-dot ' + (on ? 'connected' : '');
+        document.getElementById('fbStatusText').textContent = on ? '接続中' : '未接続';
+        if (on) loadCompanies();
+      });
+    } catch(e) {
+      console.error(e);
+      document.getElementById('fbStatusText').textContent = 'エラー';
+      document.getElementById('fbDot').className = 'fb-dot error';
+    }
+  }
+
+  // ── 会社一覧 ──
+  function loadCompanies() {
+    database.ref('qr_match_companies/profiles').once('value', snap => {
+      const data = snap.val();
+      if (!data) {
+        document.getElementById('companyList').innerHTML =
+          '<div class="company-loading">会社データなし</div>';
+        return;
+      }
+      companies = Object.values(data).sort(sortCompaniesForLogViewer);
+      renderCompanyList();
+      if (companies.length > 0) selectCompany(companies[0]);
+    });
+  }
+
+  function sortCompaniesForLogViewer(a, b) {
+    const aIsMiyama = a.name === 'ミヤマ';
+    const bIsMiyama = b.name === 'ミヤマ';
+    if (aIsMiyama !== bIsMiyama) return aIsMiyama ? -1 : 1;
+    return a.name.localeCompare(b.name, 'ja');
+  }
+
+  function renderCompanyList() {
+    document.getElementById('companyList').innerHTML = companies.map(c => `
+      <div class="company-item ${c.id === (activeCompany?.id) ? 'active' : ''}"
+           onclick="selectCompany(${JSON.stringify(c).replace(/"/g,'&quot;')})">
+        <div class="dot"></div>
+        <div class="cmp-name">${escHtml(c.name)}</div>
+      </div>
+    `).join('');
+  }
+
+  function selectCompany(company) {
+    detachRealtimeListeners();
+    activeCompany = company;
+    activeOrderSessionId = '';
+    orderSessionCustomerFilter = 'all';
+    orderSessions = [];
+    renderCompanyList();
+    document.getElementById('tableTitle').textContent = company.name + ' ログ';
+    renderOrderSessions();
+    reloadDateRange();
+    loadCustomerNameMaster(company.id);
+    loadPassThroughPartMaster(company.id);
+  }
+
+  function detachRealtimeListeners() {
+    if (logsRef) {
+      logsRef.off();
+      logsRef = null;
+    }
+    if (orderSessionsRef) {
+      orderSessionsRef.off();
+      orderSessionsRef = null;
+    }
+  }
+
+  // ── ログ読み込み ──
+  function loadLogs(companyId) {
+    document.getElementById('logTableBody').innerHTML =
+      '<tr class="loading-row"><td colspan="8">読み込み中...</td></tr>';
+    resetSummary();
+
+    logsRef = queryForDateRange('qr_match_logs/' + companyId, 'timestamp');
+    const subscribedRef = logsRef;
+    logsRef.on('value', snap => {
+        if (logsRef !== subscribedRef) return;
+        const data = snap.val();
+        if (!data) {
+          allLogs = [];
+          renderOrderSessions();
+          rebuildChoiceFilters();
+          applyFilter(false);
+          return;
+        }
+        allLogs = Object.entries(data)
+          .map(([key, val]) => ({ ...val, _key: key }))
+          .sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+        renderOrderSessions();
+        rebuildChoiceFilters();
+        applyFilter(false);
+      }, err => {
+        if (logsRef !== subscribedRef) return;
+        console.error(err);
+        document.getElementById('logTableBody').innerHTML =
+          '<tr class="loading-row"><td colspan="8">読み込みエラー: ' + escHtml(err.message) + '</td></tr>';
+      });
+  }
+
+  // ── フィルタ ──
+  function loadOrderSessions(companyId) {
+    const list = document.getElementById('detailSessionList');
+    if (list) {
+      list.innerHTML = '<div class="empty-state" style="padding:24px 12px;"><div class="empty-text">明細進捗を読み込み中...</div></div>';
+    }
+
+    orderSessionsRef = queryForDateRange('qr_match_companies/order_detail_sessions/' + companyId, 'updatedAt');
+    const subscribedRef = orderSessionsRef;
+    orderSessionsRef.on('value', snap => {
+        if (orderSessionsRef !== subscribedRef) return;
+        const data = snap.val();
+        orderSessions = data
+          ? Object.entries(data).map(([key, val]) => normalizeOrderSession({ ...val, sessionId: val.sessionId || key }))
+          : [];
+        orderSessions.sort((a,b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+        renderOrderSessions();
+      }, err => {
+        if (orderSessionsRef !== subscribedRef) return;
+        console.error(err);
+        if (list) {
+          list.innerHTML = '<div class="empty-state" style="padding:24px 12px;"><div class="empty-text">明細進捗の読み込みエラー: ' + escHtml(err.message) + '</div></div>';
+        }
+      });
+  }
+
+  function normalizeOrderSession(source) {
+    const lines = Array.isArray(source.lines) ? source.lines : Object.values(source.lines || {});
+    const baseSession = {
+      sessionId: source.sessionId || '',
+      orderQr: source.orderQr || '',
+      meta: source.meta || {},
+      details: Array.isArray(source.details) ? source.details : Object.values(source.details || {})
+    };
+    return {
+      sessionId: baseSession.sessionId,
+      orderQr: baseSession.orderQr,
+      meta: baseSession.meta,
+      details: baseSession.details,
+      lines: lines.map((line, index) => {
+        // 照合側で確定済みの除外フラグは消さない(まとめ読みで顧客コードが混在するため)
+        const excluded = !!line.excluded || isPassThroughOrderLine(baseSession, line);
+        return {
+          no: line.no || index + 1,
+          backNo: line.backNo || '',
+          partNo: line.partNo || '',
+          altPartNo: line.altPartNo || '',
+          packQty: Number(line.packQty) || 0,
+          totalQty: Number(line.totalQty) || 0,
+          requiredBoxes: Number(line.requiredBoxes) || 0,
+          scanned: Number(line.scanned) || 0,
+          excluded,
+          excludeReason: line.excludeReason || (excluded ? '仕入先パススルー' : '')
+        };
+      }),
+      scannedIds: source.scannedIds || {},
+      completedAt: source.completedAt || '',
+      completeLoggedAt: source.completeLoggedAt || '',
+      createdAt: source.createdAt || '',
+      updatedAt: source.updatedAt || ''
+    };
+  }
+
+  function orderRequiredBoxes(session) {
+    return (session.lines || []).reduce((sum, line) => sum + (line.excluded ? 0 : (Number(line.requiredBoxes) || 0)), 0);
+  }
+
+  function orderScannedBoxes(session) {
+    return (session.lines || []).reduce((sum, line) => sum + (line.excluded ? 0 : (Number(line.scanned) || 0)), 0);
+  }
+
+  function orderProgressRate(session) {
+    const required = orderRequiredBoxes(session);
+    return required > 0 ? orderScannedBoxes(session) / required : 0;
+  }
+
+  function getOrderCustomerLabel(session) {
+    const customerId = getOrderCustomerId(session);
+    if (customerId && customerNameMaster[customerId]) {
+      return `${customerNameMaster[customerId]} (${customerId})`;
+    }
+    if (customerId) return customerId;
+
+    const meta = session.meta || {};
+    const explicit = meta.customerName || meta.customer || meta.customerCode ||
+      meta.deliveryName || meta.destinationName || meta.supplierName;
+    if (explicit) return String(explicit);
+
+    const detailMeta = (session.details || [])
+      .map(d => d && d.meta)
+      .find(m => m && (m.customerName || m.customer || m.customerCode || m.deliveryName || m.destinationName || m.supplierName));
+    if (detailMeta) {
+      return String(detailMeta.customerName || detailMeta.customer || detailMeta.customerCode ||
+        detailMeta.deliveryName || detailMeta.destinationName || detailMeta.supplierName);
+    }
+    return '顧客未設定';
+  }
+
+  // 明細を複数まとめ読みすると納入先枝番違いの顧客コードが混在するため、全て拾う
+  // (例: 1枚目 400079164-3 / 2枚目 400079164-1)
+  function getOrderCustomerIds(session) {
+    const ids = [];
+    const push = value => {
+      const id = String(value || '').trim();
+      if (id && !ids.includes(id)) ids.push(id);
+    };
+    push(extractCustomerIdFromOrderQr(session && session.orderQr));
+    push(session && session.meta && session.meta.customerId);
+    ((session && session.details) || []).forEach(detail => {
+      push(extractCustomerIdFromOrderQr(detail && detail.orderQr));
+      push(detail && detail.meta && detail.meta.customerId);
+    });
+    return ids;
+  }
+
+  function getOrderCustomerId(session) {
+    return getOrderCustomerIds(session)[0] || '';
+  }
+
+  function getOrderCustomerFilterKey(session) {
+    const customerId = getOrderCustomerId(session);
+    return customerId || `label:${getOrderCustomerLabel(session)}`;
+  }
+
+  function getFilteredOrderSessions() {
+    if (!orderSessionCustomerFilter || orderSessionCustomerFilter === 'all') return [...orderSessions];
+    return orderSessions.filter(session => getOrderCustomerFilterKey(session) === orderSessionCustomerFilter);
+  }
+
+  function renderOrderCustomerFilterOptions() {
+    const select = document.getElementById('detailCustomerFilter');
+    if (!select) return;
+    const options = new Map();
+    orderSessions.forEach(session => {
+      const key = getOrderCustomerFilterKey(session);
+      if (!key) return;
+      if (!options.has(key)) options.set(key, getOrderCustomerLabel(session));
+    });
+    const sorted = [...options.entries()].sort((a, b) => a[1].localeCompare(b[1], 'ja', { numeric: true }));
+    if (orderSessionCustomerFilter !== 'all' && !options.has(orderSessionCustomerFilter)) {
+      orderSessionCustomerFilter = 'all';
+    }
+    select.innerHTML = '<option value="all">顧客すべて</option>' +
+      sorted.map(([key, label]) => `<option value="${escHtml(key)}">${escHtml(label)}</option>`).join('');
+    select.value = orderSessionCustomerFilter || 'all';
+  }
+
+  function extractCustomerIdFromOrderQr(qr) {
+    const text = String(qr || '');
+    const match = text.match(/[VL](\d{9})\s*([0-9A-Z])\b/);
+    if (match) return `${match[1]}-${match[2]}`;
+    const fallback = text.match(/[VL](\d{9})/);
+    return fallback ? fallback[1] : '';
+  }
+
+  function canonicalPart(value) {
+    return String(value || '')
+      .normalize('NFKC')
+      .toUpperCase()
+      .replace(/[\u2010-\u2015\u2212\uFE58\uFE63]/g, '-')
+      .replace(/[^0-9A-Z]/g, '');
+  }
+
+  function partVariants(partNo) {
+    const raw = String(partNo || '').normalize('NFKC').toUpperCase();
+    const base = canonicalPart(raw);
+    const variants = new Set([base]);
+    if (/-00$/.test(raw)) variants.add(canonicalPart(raw.replace(/-00$/, '')));
+    const secondHyphenBase = raw.match(/^([0-9A-Z]+-[0-9A-Z]+)-[0-9A-Z]+$/);
+    if (secondHyphenBase) variants.add(canonicalPart(secondHyphenBase[1]));
+    return [...variants].filter(Boolean);
+  }
+
+  function isPassThroughOrderLine(session, line) {
+    const parts = getOrderCustomerIds(session)
+      .flatMap(customerId => (passThroughPartMaster && passThroughPartMaster[customerId]) || []);
+    if (!parts.length) return false;
+    const targets = new Set(parts.flatMap(partVariants));
+    const lineParts = [line && line.partNo, line && line.altPartNo].filter(Boolean);
+    return lineParts.flatMap(partVariants).some(part => targets.has(part));
+  }
+
+  function orderLinePartLabel(line) {
+    if (!line) return '-';
+    return `${line.partNo || '-'}${line.altPartNo ? `(${line.altPartNo})` : ''}`;
+  }
+
+  function sortedOrderSessions() {
+    const sorted = getFilteredOrderSessions();
+    const sortMode = orderSessionSort || 'updated_desc';
+    sorted.sort((a, b) => {
+      if (sortMode === 'customer_asc') {
+        const byCustomer = getOrderCustomerLabel(a).localeCompare(getOrderCustomerLabel(b), 'ja', { numeric: true });
+        if (byCustomer) return byCustomer;
+      } else if (sortMode === 'progress_asc') {
+        const byProgress = orderProgressRate(a) - orderProgressRate(b);
+        if (byProgress) return byProgress;
+      } else if (sortMode === 'progress_desc') {
+        const byProgress = orderProgressRate(b) - orderProgressRate(a);
+        if (byProgress) return byProgress;
+      }
+      return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+    });
+    return sorted;
+  }
+
+  function changeOrderSessionSort() {
+    const select = document.getElementById('detailSortSelect');
+    orderSessionSort = select ? select.value : 'updated_desc';
+    renderOrderSessions();
+  }
+
+  function changeOrderSessionCustomerFilter() {
+    const select = document.getElementById('detailCustomerFilter');
+    orderSessionCustomerFilter = select ? select.value : 'all';
+    renderOrderSessions();
+  }
+
+  function toggleDetailBoard(event) {
+    if (event) event.stopPropagation();
+    detailBoardOpen = !detailBoardOpen;
+    renderDetailBoardState();
+  }
+
+  function renderDetailBoardState() {
+    const board = document.getElementById('detailBoard');
+    const toggle = document.getElementById('detailBoardToggle');
+    if (!board) return;
+    board.classList.toggle('collapsed', !detailBoardOpen);
+    if (toggle) toggle.textContent = detailBoardOpen ? '閉じる' : '表示';
+  }
+
+  function formatYmd(value) {
+    const text = String(value || '');
+    const match = text.match(/^(\d{4})(\d{2})(\d{2})$/);
+    return match ? `${match[1]}/${match[2]}/${match[3]}` : (text || '-');
+  }
+
+  function getOrderInstructionDate(session) {
+    const meta = session.meta || {};
+    const fromMeta = meta.instructionDate || meta.shipDate || meta.deliveryDate || '';
+    if (fromMeta) return formatYmd(fromMeta);
+    const qr = session.orderQr || '';
+    const fromQr = (qr.match(/16D(\d{8})/) || [])[1] || (qr.match(/12D(\d{8})/) || [])[1] || '';
+    return fromQr ? formatYmd(fromQr) : '-';
+  }
+
+  function getOrderDeliveryBin(session) {
+    const meta = session.meta || {};
+    const fromMeta = meta.deliveryBin || meta.bin || meta.deliveryRun || '';
+    if (fromMeta) return String(fromMeta).replace(/便$/, '');
+    const qr = session.orderQr || '';
+    const fromQr = (qr.match(/9D(\d)/) || [])[1] || '';
+    return fromQr || '-';
+  }
+
+  function parseToyotaDestinationCodeFromText(text) {
+    const compact = String(text || '').normalize('NFKC').replace(/\s+/g, '');
+    const match = compact.match(/W[0-9A-Z](\d{4})([A-Z])/i);
+    return match ? `${match[1]}-${match[2].toUpperCase()}` : '';
+  }
+
+  function parseToyotaReceivingCodeFromText(text) {
+    const compact = String(text || '').normalize('NFKC').replace(/\s+/g, '');
+    const match = compact.match(/W[0-9A-Z]\d{4}[A-Z]R(\d)/i);
+    return match ? `R${Number(match[1])}` : '';
+  }
+
+  function getOrderDestinationCode(session) {
+    const meta = session.meta || {};
+    return meta.destinationCode || meta.deliveryDestinationCode || meta.deliveryPlaceCode ||
+      parseToyotaDestinationCodeFromText(session.orderQr) || '-';
+  }
+
+  function getOrderReceivingCode(session) {
+    const meta = session.meta || {};
+    return meta.receivingCode || meta.acceptanceCode || meta.receiveCode ||
+      parseToyotaReceivingCodeFromText(session.orderQr) || '-';
+  }
+
+  function renderOrderSessions() {
+    const list = document.getElementById('detailSessionList');
+    const count = document.getElementById('detailSessionCount');
+    renderOrderCustomerFilterOptions();
+    const visibleSessions = getFilteredOrderSessions();
+    const incomplete = visibleSessions.filter(session => {
+      const required = orderRequiredBoxes(session);
+      return required > 0 && orderScannedBoxes(session) < required;
+    }).length;
+    if (count) {
+      const totalText = visibleSessions.length === orderSessions.length
+        ? orderSessions.length.toLocaleString() + '件'
+        : `${visibleSessions.length.toLocaleString()}件 / 全${orderSessions.length.toLocaleString()}件`;
+      count.textContent = totalText + ' / 未完了 ' + incomplete.toLocaleString() + '件';
+    }
+    renderCurrentWorkSessions();
+    const sortSelect = document.getElementById('detailSortSelect');
+    if (sortSelect) sortSelect.value = orderSessionSort || 'updated_desc';
+    renderDetailBoardState();
+    if (!list) return;
+
+    if (!orderSessions.length) {
+      list.innerHTML = '<div class="empty-state" style="padding:24px 12px;"><div class="empty-text">注文明細の進捗データはありません</div></div>';
+      renderDetailFilterNote();
+      return;
+    }
+
+    if (!visibleSessions.length) {
+      list.innerHTML = '<div class="empty-state" style="padding:24px 12px;"><div class="empty-text">選択した顧客の明細はありません</div></div>';
+      renderDetailFilterNote();
+      return;
+    }
+
+    list.innerHTML = sortedOrderSessions().map(session => {
+      const required = orderRequiredBoxes(session);
+      const scanned = orderScannedBoxes(session);
+      const rate = required > 0 ? Math.min(100, Math.round(scanned / required * 100)) : 0;
+      const done = required > 0 && scanned >= required;
+      const statusClass = done ? 'done' : (scanned > 0 ? 'active' : 'empty');
+      const statusText = done ? '完了' : (scanned > 0 ? '処理中' : '未着手');
+      const deleteButton = !done
+        ? `<button class="detail-delete-btn" onclick="deleteOrderSession(event,'${escJs(session.sessionId)}')">削除</button>`
+        : '';
+      const customer = getOrderCustomerLabel(session);
+      const instructionDate = getOrderInstructionDate(session);
+      const deliveryBin = getOrderDeliveryBin(session);
+      const destinationCode = getOrderDestinationCode(session);
+      const receivingCode = getOrderReceivingCode(session);
+      const updated = session.updatedAt || session.createdAt;
+      const updatedText = updated ? new Date(updated).toLocaleString('ja-JP') : '-';
+      const detailCount = Array.isArray(session.details) ? session.details.length : 0;
+      const chips = (session.lines || []).slice(0, 5).map(line => {
+        const lineDone = Number(line.requiredBoxes) > 0 && Number(line.scanned) >= Number(line.requiredBoxes);
+        const lineClass = line.excluded ? 'excluded' : (lineDone ? 'done' : '');
+        const countText = line.excluded ? '対象外' : `${Number(line.scanned)||0}/${Number(line.requiredBoxes)||0}`;
+        return `<span class="detail-line-chip ${lineClass}">${escHtml(orderLinePartLabel(line))} ${escHtml(countText)}</span>`;
+      }).join('');
+      const more = session.lines.length > 5 ? `<span class="detail-line-chip">+${session.lines.length - 5}</span>` : '';
+      return `
+        <div class="detail-session-card ${session.sessionId === activeOrderSessionId ? 'active' : ''}"
+             onclick="selectOrderSession('${escJs(session.sessionId)}')">
+          <div class="detail-session-top">
+            <div class="detail-session-name">${escHtml(customer)} / ${escHtml(session.sessionId || '-')}</div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="detail-status ${statusClass}">${statusText}</span>
+              ${deleteButton}
+            </div>
+          </div>
+          <div class="detail-progress-row">
+            <span>${escHtml(scanned)} / ${escHtml(required)}</span>
+            <div class="detail-progress-bar"><div class="detail-progress-fill" style="width:${rate}%"></div></div>
+            <span>${rate}%</span>
+          </div>
+          <div class="detail-session-meta">
+            <span>更新 ${escHtml(updatedText)}</span>
+            <span>指示日 ${escHtml(instructionDate)}</span>
+            <span>便 ${escHtml(deliveryBin)}</span>
+            <span>納入先 ${escHtml(destinationCode)}</span>
+            <span>受入 ${escHtml(receivingCode)}</span>
+            <span>行 ${escHtml(session.lines.length)}</span>
+            <span>QR ${escHtml(detailCount)}</span>
+            <span>ログ ${escHtml(countLogsForSession(session.sessionId))}</span>
+          </div>
+          <div class="detail-lines">${chips}${more}</div>
+        </div>`;
+    }).join('');
+    renderDetailFilterNote();
+  }
+
+  function renderCurrentWorkSessions() {
+    const list = document.getElementById('currentWorkList');
+    const live = document.getElementById('currentWorkLive');
+    if (!list) return;
+    if (live) live.textContent = database ? 'リアルタイム' : '未接続';
+
+    const activeSessions = orderSessions
+      .filter(session => {
+        const required = orderRequiredBoxes(session);
+        const scanned = orderScannedBoxes(session);
+        return required > 0 && scanned < required;
+      })
+      .sort((a, b) => {
+        const aScanned = orderScannedBoxes(a);
+        const bScanned = orderScannedBoxes(b);
+        const aWorking = aScanned > 0 ? 1 : 0;
+        const bWorking = bScanned > 0 ? 1 : 0;
+        if (aWorking !== bWorking) return bWorking - aWorking;
+        return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+      })
+      .slice(0, 5);
+
+    if (!activeSessions.length) {
+      list.innerHTML = '<div class="current-work-empty">現在作業中の明細はありません</div>';
+      return;
+    }
+
+    list.innerHTML = activeSessions.map(session => {
+      const required = orderRequiredBoxes(session);
+      const scanned = orderScannedBoxes(session);
+      const rate = required > 0 ? Math.min(100, Math.round(scanned / required * 100)) : 0;
+      const customer = getOrderCustomerLabel(session);
+      const updated = session.updatedAt || session.createdAt;
+      const updatedText = updated ? new Date(updated).toLocaleString('ja-JP') : '-';
+      const instructionDate = getOrderInstructionDate(session);
+      const deliveryBin = getOrderDeliveryBin(session);
+      const destinationCode = getOrderDestinationCode(session);
+      const receivingCode = getOrderReceivingCode(session);
+      const chips = (session.lines || [])
+        .filter(line => !line.excluded && Number(line.requiredBoxes) > 0 && Number(line.scanned) < Number(line.requiredBoxes))
+        .slice(0, 4)
+        .map(line => `<span class="detail-line-chip">${escHtml(orderLinePartLabel(line))} ${Number(line.scanned)||0}/${Number(line.requiredBoxes)||0}</span>`)
+        .join('');
+      return `
+        <div class="current-work-card" onclick="selectOrderSession('${escJs(session.sessionId)}')">
+          <div class="current-work-top">
+            <div class="current-work-name">${escHtml(customer)} / ${escHtml(session.sessionId || '-')}</div>
+            <div class="current-work-time">${escHtml(updatedText)}</div>
+          </div>
+          <div class="detail-progress-row">
+            <span>${escHtml(scanned)} / ${escHtml(required)}</span>
+            <div class="detail-progress-bar"><div class="detail-progress-fill" style="width:${rate}%"></div></div>
+            <span>${rate}%</span>
+          </div>
+          <div class="detail-session-meta">
+            <span>指示日 ${escHtml(instructionDate)}</span>
+            <span>便 ${escHtml(deliveryBin)}</span>
+            <span>納入先 ${escHtml(destinationCode)}</span>
+            <span>受入 ${escHtml(receivingCode)}</span>
+            <span>ログ ${escHtml(countLogsForSession(session.sessionId))}</span>
+          </div>
+          <div class="detail-lines">${chips}</div>
+        </div>`;
+    }).join('');
+  }
+
+  function countLogsForSession(sessionId) {
+    return allLogs.filter(l => l.orderDetailSessionId === sessionId).length;
+  }
+
+  function formatDateInputLocal(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function setLogDateFilterForOrderSession(sessionId) {
+    const session = orderSessions.find(s => s.sessionId === sessionId);
+    const dates = [];
+    const addDate = value => {
+      if (!value) return;
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) dates.push(date);
+    };
+    addDate(session && session.createdAt);
+    addDate(session && session.updatedAt);
+    (session && Array.isArray(session.details) ? session.details : []).forEach(detail => addDate(detail && detail.readAt));
+    allLogs
+      .filter(log => log.orderDetailSessionId === sessionId)
+      .forEach(log => addDate(log.timestamp));
+    if (!dates.length) return;
+    dates.sort((a, b) => a - b);
+    const from = new Date(dates[0]);
+    const to = new Date(dates[dates.length - 1]);
+    from.setDate(from.getDate() - 1);
+    to.setDate(to.getDate() + 1);
+    const fromInput = document.getElementById('filterDateFrom');
+    const toInput = document.getElementById('filterDateTo');
+    if (fromInput) fromInput.value = formatDateInputLocal(from);
+    if (toInput) toInput.value = formatDateInputLocal(to);
+  }
+
+  async function verifyCompanyAdminPassword() {
+    if (!activeCompany || !database) return false;
+    const input = prompt('管理者パスワードを入力してください');
+    if (input === null) return false;
+    try {
+      const snap = await database.ref('qr_match_companies/settings/' + activeCompany.id + '/adminPassword').once('value');
+      const adminPassword = snap.val() || 'admin';
+      if (String(input) === String(adminPassword)) return true;
+      alert('パスワードが違います');
+      return false;
+    } catch (err) {
+      console.error('管理者パスワード確認エラー:', err);
+      alert('パスワード確認に失敗しました');
+      return false;
+    }
+  }
+
+  async function deleteOrderSession(event, sessionId) {
+    if (event) event.stopPropagation();
+    if (!activeCompany || !sessionId) return;
+    const session = orderSessions.find(s => s.sessionId === sessionId);
+    if (!session) {
+      alert('対象の明細データが見つかりません');
+      return;
+    }
+    const required = orderRequiredBoxes(session);
+    const scanned = orderScannedBoxes(session);
+    if (required > 0 && scanned >= required) {
+      alert('完了済みの明細データは削除できません');
+      return;
+    }
+    const customer = getOrderCustomerLabel(session);
+    if (!confirm(`未処理の明細データを削除しますか？\n\n${customer}\n${sessionId}\n進捗 ${scanned}/${required}\n\n※照合ログ自体は残ります。`)) return;
+    const ok = await verifyCompanyAdminPassword();
+    if (!ok) return;
+    try {
+      await database.ref('qr_match_companies/order_detail_sessions/' + activeCompany.id + '/' + sessionId).remove();
+      orderSessions = orderSessions.filter(s => s.sessionId !== sessionId);
+      if (activeOrderSessionId === sessionId) {
+        activeOrderSessionId = '';
+        currentPage = 1;
+      }
+      renderOrderSessions();
+      applyFilter();
+      alert('未処理の明細データを削除しました');
+    } catch (err) {
+      console.error('明細データ削除エラー:', err);
+      alert('削除に失敗しました: ' + err.message);
+    }
+  }
+
+  function selectOrderSession(sessionId) {
+    activeOrderSessionId = sessionId || '';
+    currentPage = 1;
+    if (activeOrderSessionId) setLogDateFilterForOrderSession(activeOrderSessionId);
+    renderOrderSessions();
+    applyFilter();
+    document.querySelector('.table-wrap')?.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  function clearOrderSessionFilter() {
+    activeOrderSessionId = '';
+    currentPage = 1;
+    renderOrderSessions();
+    applyFilter();
+  }
+
+  function renderDetailFilterNote() {
+    const note = document.getElementById('detailFilterNote');
+    const text = document.getElementById('detailFilterText');
+    if (!note || !text) return;
+    if (!activeOrderSessionId) {
+      note.classList.remove('show');
+      return;
+    }
+    const session = orderSessions.find(s => s.sessionId === activeOrderSessionId);
+    const required = session ? orderRequiredBoxes(session) : 0;
+    const scanned = session ? orderScannedBoxes(session) : 0;
+    text.textContent = `明細セッションで絞り込み中: ${activeOrderSessionId} (${scanned}/${required})`;
+    note.classList.add('show');
+  }
+
+  function loadCustomerNameMaster(companyId) {
+    customerNameMaster = {};
+    if (!database || !companyId) return;
+    database.ref('qr_match_companies/customer_name_master/' + companyId).once('value', snap => {
+      customerNameMaster = snap.val() || {};
+      renderOrderSessions();
+      rebuildChoiceFilters();   // 納入先の表示名がここで確定する
+    }, err => {
+      console.error('顧客名マスタ読み込みエラー:', err);
+    });
+  }
+
+  function collectCustomerIdsFromSessions() {
+    const ids = new Set(Object.keys(customerNameMaster || {}));
+    orderSessions.forEach(session => {
+      const id = getOrderCustomerId(session);
+      if (id) ids.add(id);
+    });
+    return [...ids].sort((a, b) => a.localeCompare(b, 'ja', { numeric: true }));
+  }
+
+  function openCustomerMasterModal() {
+    if (!activeCompany) {
+      alert('会社を選択してください');
+      return;
+    }
+    const ids = collectCustomerIdsFromSessions();
+    document.getElementById('modalTitle').textContent = '顧客名マスタ編集';
+    document.getElementById('modalBody').innerHTML = `
+      <div class="master-editor" id="customerMasterRows">
+        ${ids.map(id => customerMasterRowHtml(id, customerNameMaster[id] || '')).join('')}
+      </div>
+      <div class="master-actions">
+        <button class="filter-btn" onclick="addCustomerMasterRow()">追加</button>
+        <button class="filter-btn primary" onclick="saveCustomerNameMaster()">保存</button>
+      </div>
+    `;
+    document.getElementById('modalOverlay').classList.add('show');
+  }
+
+  function customerMasterRowHtml(customerId = '', customerName = '') {
+    return `
+      <div class="master-row">
+        <input class="master-input customer-id-input" placeholder="顧客ID" value="${escHtml(customerId)}">
+        <input class="master-input customer-name-input" placeholder="顧客名" value="${escHtml(customerName)}">
+        <button class="filter-btn" onclick="this.closest('.master-row').remove()">削除</button>
+      </div>`;
+  }
+
+  function addCustomerMasterRow() {
+    const rows = document.getElementById('customerMasterRows');
+    if (!rows) return;
+    rows.insertAdjacentHTML('beforeend', customerMasterRowHtml('', ''));
+  }
+
+  function saveCustomerNameMaster() {
+    if (!activeCompany || !database) return;
+    const rows = [...document.querySelectorAll('#customerMasterRows .master-row')];
+    const next = {};
+    rows.forEach(row => {
+      const id = row.querySelector('.customer-id-input')?.value.trim();
+      const name = row.querySelector('.customer-name-input')?.value.trim();
+      if (id && name) next[id] = name;
+    });
+    database.ref('qr_match_companies/customer_name_master/' + activeCompany.id).set(next)
+      .then(() => {
+        customerNameMaster = next;
+        renderOrderSessions();
+        closeModal();
+      })
+      .catch(err => {
+        console.error('顧客名マスタ保存エラー:', err);
+        alert('顧客名マスタを保存できませんでした');
+      });
+  }
+
+  function normalizePassThroughMaster(source, useDefault = true) {
+    if (source && source._empty) return {};
+    const keys = Object.keys(source || {}).filter(key => !key.startsWith('_'));
+    const src = keys.length ? source : (useDefault ? DEFAULT_PASS_THROUGH_PART_MASTER : {});
+    const next = {};
+    Object.entries(src || {}).forEach(([customerId, parts]) => {
+      if (customerId.startsWith('_')) return;
+      const list = Array.isArray(parts) ? parts : String(parts || '').split(/[\s,、]+/);
+      const clean = [...new Set(list.map(v => String(v || '').trim()).filter(Boolean))];
+      if (customerId && clean.length) next[customerId] = clean;
+    });
+    return next;
+  }
+
+  function loadPassThroughPartMaster(companyId) {
+    passThroughPartMaster = normalizePassThroughMaster(null);
+    if (!database || !companyId) return;
+    database.ref('qr_match_companies/pass_through_part_master/' + companyId).once('value', snap => {
+      passThroughPartMaster = normalizePassThroughMaster(snap.val(), !snap.exists());
+      renderOrderSessions();
+    }, err => {
+      console.error('除外品番マスタ読み込みエラー:', err);
+      renderOrderSessions();
+    });
+  }
+
+  function collectPassThroughCustomerIds() {
+    const ids = new Set([
+      ...Object.keys(passThroughPartMaster || {}),
+      ...collectCustomerIdsFromSessions()
+    ]);
+    return [...ids].sort((a, b) => a.localeCompare(b, 'ja', { numeric: true }));
+  }
+
+  function openPassThroughMasterModal() {
+    if (!activeCompany) {
+      alert('会社を選択してください');
+      return;
+    }
+    const ids = collectPassThroughCustomerIds();
+    document.getElementById('modalTitle').textContent = '除外品番マスタ編集';
+    document.getElementById('modalBody').innerHTML = `
+      <div style="font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:10px;">
+        顧客IDごとに、照合対象外にする品番を改行またはカンマ区切りで登録します。
+      </div>
+      <div class="master-editor" id="passThroughMasterRows">
+        ${ids.map(id => passThroughMasterRowHtml(id, passThroughPartMaster[id] || [])).join('')}
+      </div>
+      <div class="master-actions">
+        <button class="filter-btn" onclick="addPassThroughMasterRow()">追加</button>
+        <button class="filter-btn primary" onclick="savePassThroughPartMaster()">保存</button>
+      </div>
+    `;
+    document.getElementById('modalOverlay').classList.add('show');
+  }
+
+  function passThroughMasterRowHtml(customerId = '', parts = []) {
+    const value = (Array.isArray(parts) ? parts : []).join('\n');
+    return `
+      <div class="master-row" style="grid-template-columns:140px 1fr 64px;align-items:start;">
+        <input class="master-input pass-customer-id-input" placeholder="顧客ID" value="${escHtml(customerId)}">
+        <textarea class="master-input pass-parts-input" placeholder="除外品番（改行区切り）" rows="4" style="resize:vertical;min-height:74px;">${escHtml(value)}</textarea>
+        <button class="filter-btn" onclick="this.closest('.master-row').remove()">削除</button>
+      </div>`;
+  }
+
+  function addPassThroughMasterRow() {
+    const rows = document.getElementById('passThroughMasterRows');
+    if (!rows) return;
+    rows.insertAdjacentHTML('beforeend', passThroughMasterRowHtml('', []));
+  }
+
+  function savePassThroughPartMaster() {
+    if (!activeCompany || !database) return;
+    const rows = [...document.querySelectorAll('#passThroughMasterRows .master-row')];
+    const next = {};
+    rows.forEach(row => {
+      const id = row.querySelector('.pass-customer-id-input')?.value.trim();
+      const text = row.querySelector('.pass-parts-input')?.value || '';
+      const parts = [...new Set(text.split(/[\s,、]+/).map(v => v.trim()).filter(Boolean))];
+      if (id && parts.length) next[id] = parts;
+    });
+    const payload = Object.keys(next).length ? next : { _empty: true };
+    database.ref('qr_match_companies/pass_through_part_master/' + activeCompany.id).set(payload)
+      .then(() => {
+        passThroughPartMaster = normalizePassThroughMaster(payload, false);
+        renderOrderSessions();
+        closeModal();
+      })
+      .catch(err => {
+        console.error('除外品番マスタ保存エラー:', err);
+        alert('除外品番マスタを保存できませんでした');
+      });
+  }
+
+  // ログ1件の納入先。QR1から取れるコードを顧客名マスタで名前に変える。
+  function logCustomerId(l) {
+    return extractCustomerIdFromOrderQr(l.qr1 || l.qr1_raw || '');
+  }
+
+  // 名前が登録されていればそれだけ出す。未登録のときはコードで判別する。
+  function customerLabel(cid) {
+    const name = customerNameMaster && customerNameMaster[cid];
+    return name ? String(name).replace(/\s+/g, ' ').trim() : cid;
+  }
+
+  // 選択肢は読み込んだログから作る。件数の多い順に並べ、選択中の値は残す。
+  function rebuildChoiceFilters() {
+    const fill = (id, values, labelOf) => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const keep = sel.value;
+      const sorted = [...values.entries()].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), 'ja'));
+      sel.innerHTML = '<option value="all">すべて</option>' +
+        sorted.map(([v, n]) => `<option value="${escHtml(v)}">${escHtml(labelOf(v))}（${n}）</option>`).join('');
+      sel.value = [...values.keys()].includes(keep) ? keep : 'all';
+    };
+    const tally = pick => {
+      const map = new Map();
+      allLogs.forEach(l => {
+        const v = pick(l);
+        if (!v) return;
+        map.set(v, (map.get(v) || 0) + 1);
+      });
+      return map;
+    };
+    fill('filterWorker', tally(l => l.workerName || l.operatorName), v => v);
+    fill('filterResolver', tally(l => l.resolverName), v => v);
+    fill('filterCustomer', tally(logCustomerId), customerLabel);
+  }
+
+  function applyFilter(resetPage = true) {
+    const range = getLogDateRange();
+    if (range.start && range.end && range.start > range.end) {
+      document.getElementById('logTableBody').innerHTML =
+        '<tr class="loading-row"><td colspan="8">開始日を終了日以前にしてください</td></tr>';
+      return;
+    }
+    if (database && activeCompany && loadedDateRange !== range.key) {
+      reloadDateRange();
+      return;
+    }
+    const result   = document.getElementById('filterResult').value;
+    const dateFrom = document.getElementById('filterDateFrom').value;
+    const dateTo   = document.getElementById('filterDateTo').value;
+    const part     = document.getElementById('filterPart').value.trim().toLowerCase();
+    const branch   = document.getElementById('filterBranch').value.trim();
+    const worker   = document.getElementById('filterWorker').value;
+    const resolver = document.getElementById('filterResolver').value;
+    const customer = document.getElementById('filterCustomer').value;
+
+    filteredLogs = allLogs.filter(l => {
+      if (activeOrderSessionId && l.orderDetailSessionId !== activeOrderSessionId) return false;
+      if (worker !== 'all' && (l.workerName || l.operatorName || '') !== worker) return false;
+      if (resolver !== 'all' && (l.resolverName || '') !== resolver) return false;
+      if (customer !== 'all' && logCustomerId(l) !== customer) return false;
+      if (result !== 'all') {
+        const isDup = l.result === 'DUP' || l.isDuplicate;
+        if (result === 'DUP' && !isDup) return false;
+        if (result === 'OK' && (isDup || l.result !== 'OK')) return false;
+        if (result === 'NG' && (isDup || l.result !== 'NG')) return false;
+        if (result === 'NG_MISMATCH' && (isDup || l.result !== 'NG' || !isPartMismatchLog(l))) return false;
+      }
+      if (dateFrom) {
+        if (new Date(l.timestamp) < new Date(range.start)) return false;
+      }
+      if (dateTo) {
+        if (new Date(l.timestamp) > new Date(range.end)) return false;
+      }
+      if (part) {
+        const pn = (l.partNumber || '').toLowerCase();
+        const q1 = (l.qr1 || '').toLowerCase();
+        if (!pn.includes(part) && !q1.includes(part)) return false;
+      }
+      if (branch && !matchesKanbanBranch(l, branch)) return false;
+      return true;
+    });
+
+    if (resetPage) currentPage = 1;
+    updateSummary();
+    renderTable();
+  }
+
+  function resetFilter() {
+    document.getElementById('filterResult').value   = 'all';
+    document.getElementById('filterPart').value     = '';
+    document.getElementById('filterBranch').value   = '';
+    document.getElementById('filterWorker').value   = 'all';
+    document.getElementById('filterResolver').value = 'all';
+    document.getElementById('filterCustomer').value = 'all';
+    const today = getTodayJst();
+    document.getElementById('filterDateFrom').value = today;
+    document.getElementById('filterDateTo').value   = today;
+    applyFilter();
+  }
+
+  // 枝番は社内かんばん（2回目QR）の独立した項目として照合する。
+  // 文字列部分一致にすると、品番や数量に含まれる同じ数字を拾うため区切り位置も確認する。
+  function matchesKanbanBranch(log, branch) {
+    const value = String(branch || '').trim();
+    if (!value) return true;
+    const qr2 = String(log.qr2_raw || log.qr2 || '');
+    const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^0-9A-Z])${escaped}(?=$|[^0-9A-Z])`, 'i').test(qr2);
+  }
+
+  function logContextRows(log, count = 2) {
+    if (!log.orderDetailSessionId) return [];
+    const sessionLogs = allLogs
+      .filter(item => item.orderDetailSessionId === log.orderDetailSessionId && item.timestamp)
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const index = sessionLogs.findIndex(item => item.firebaseKey === log.firebaseKey || item.logId === log.logId);
+    if (index < 0) return [];
+    return sessionLogs.slice(Math.max(0, index - count), index + count + 1);
+  }
+
+  function changePerPage() {
+    perPage = parseInt(document.getElementById('perPageSelect').value);
+    currentPage = 1;
+    renderTable();
+  }
+
+  // ── サマリー ──
+  function updateSummary() {
+    const total = filteredLogs.length;
+    let ok = 0, ng = 0, dup = 0;
+    filteredLogs.forEach(l => {
+      if (l.result === 'DUP' || l.isDuplicate) dup++;
+      else if (l.result === 'OK') ok++;
+      else ng++;
+    });
+    const rate = total > 0 ? Math.round(ok / total * 1000) / 10 : 0;
+
+    document.getElementById('sumTotal').textContent = total.toLocaleString();
+    document.getElementById('sumOK').textContent    = ok.toLocaleString();
+    document.getElementById('sumNG').textContent    = ng.toLocaleString();
+    document.getElementById('sumDUP').textContent   = dup.toLocaleString();
+    document.getElementById('sumRate').textContent  = total > 0 ? rate + '%' : '—';
+
+    if (filteredLogs.length > 0) {
+      const oldest = new Date(filteredLogs[filteredLogs.length-1].timestamp).toLocaleDateString('ja-JP');
+      const newest = new Date(filteredLogs[0].timestamp).toLocaleDateString('ja-JP');
+      document.getElementById('sumDateRange').textContent =
+        oldest === newest ? oldest : oldest + ' 〜 ' + newest;
+    } else {
+      document.getElementById('sumDateRange').textContent = '—';
+    }
+  }
+
+  function resetSummary() {
+    ['sumTotal','sumOK','sumNG','sumDUP','sumRate'].forEach(id => {
+      document.getElementById(id).textContent = '—';
+    });
+    document.getElementById('sumDateRange').textContent = '—';
+  }
+
+  // ── テーブル描画 ──
+  // NGログの大半はかんばん種別エラーと明細QRの読み取りエラーで、品番違いとは別物。
+  // partNumber 欄に入る擬似品番と、読み取り段階のエラーnoteを除くと品番違いだけが残る。
+  const PSEUDO_PARTS = new Set([
+    'KANBAN_TYPE_ERROR', 'ORDER_DETAIL', 'ORDER_DETAIL_COMPLETE',
+    'ORDER_DETAIL_MANUAL_COMPLETE', 'ERROR_RELEASE'
+  ]);
+  const NON_MISMATCH_NOTES = new Set([
+    'order_detail_parse_error', 'order_detail_too_short', 'order_detail_read_ok'
+  ]);
+
+  function isPartMismatchLog(l) {
+    if (PSEUDO_PARTS.has(l.partNumber || '')) return false;
+    const note = String(l.extractNote || '');
+    if (note.startsWith('kanban_type_error')) return false;
+    if (NON_MISMATCH_NOTES.has(note.split(':')[0])) return false;
+    // 数量超過は品番が一致したうえで箱数が超えたもの。品番違いではないので外す。
+    if (/^(数量超過|注文明細外)/.test(String(l.orderDetailNote || ''))) return false;
+    // '+' のような1〜2文字のQR2はスキャナの誤入力。かんばんとして成立しない。
+    const qr2 = String(l.qr2 || '').trim();
+    if (qr2 && qr2.length <= 2) return false;
+    // 明細に一致した品番がQR1側に見当たらないものは、客先かんばん自体が明細と違うケース。
+    // 社内かんばんの品番違いとは別問題なので外す。
+    if (!qr1MatchesDetail(l)) return false;
+    return true;
+  }
+
+  function qr1MatchesDetail(l) {
+    const hit = l.orderDetailSearchHit || l.partNumber || '';
+    if (!hit) return false;
+    const q1 = canonicalPart(l.qr1 || '');
+    return partVariants(hit).some(v => v && q1.includes(v));
+  }
+
+  // 重複は「どちらのかんばんが重複したか」で対処が変わるので、タグで区別して出す
+  const DUP_LABELS = { qr1: '客先かんばん重複', qr2: '社内かんばん重複', vs: '客先＝社内 一致' };
+
+  function dupLabelOf(l) {
+    return DUP_LABELS[l && l.dupType] || '重複';
+  }
+
+  function resultLabelOf(l) {
+    if (l.result === 'DUP' || l.isDuplicate) return '⚠ ' + dupLabelOf(l);
+    return l.result === 'OK' ? '✓ OK' : '✕ NG';
+  }
+
+  // 一覧に出す担当者。解除ログには処置者が入るので、作業者と併記する。
+  function personLabel(l) {
+    const worker = l.workerName || l.operatorName || '';
+    const resolver = l.resolverName || '';
+    if (worker && resolver) return `${worker} → ${resolver}`;
+    return worker || resolver || '—';
+  }
+
+  function formatOrderDetailLogText(l) {
+    if (!l.orderDetailActive && !l.orderDetailSessionId) return '—';
+    if (l.orderDetailRead) {
+      return `明細QR:${l.orderDetailReadResult || l.result || '-'} 行:${l.orderDetailLineCount ?? '-'}`;
+    }
+    if (l.orderDetailAction) {
+      return `${l.orderDetailAction} ${l.orderDetailScannedBoxes ?? '-'}/${l.orderDetailRequiredBoxes ?? '-'}`;
+    }
+    if (l.orderDetailCompleted) {
+      return `完了 ${l.orderDetailScannedBoxes ?? '-'}/${l.orderDetailRequiredBoxes ?? '-'}`;
+    }
+    const status = l.orderDetailResult ? `明細${l.orderDetailResult}` : '明細';
+    const count = l.orderDetailRequiredBoxes ? ` ${l.orderDetailScannedBoxes ?? 0}/${l.orderDetailRequiredBoxes}` : '';
+    const note = l.orderDetailNote ? ` ${l.orderDetailNote}` : '';
+    return `${status}${count}${note}`;
+  }
+
+  function renderTable() {
+    const total    = filteredLogs.length;
+    const totalPages = Math.max(1, Math.ceil(total / perPage));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const start = (currentPage - 1) * perPage;
+    const slice = filteredLogs.slice(start, start + perPage);
+
+    document.getElementById('tableCount').textContent = total.toLocaleString() + '件';
+
+    if (total === 0) {
+      document.getElementById('logTableBody').innerHTML =
+        '<tr class="loading-row"><td colspan="8">' +
+        (allLogs.length === 0 ? 'データがありません' : 'フィルタ条件に一致するログがありません') +
+        '</td></tr>';
+      document.getElementById('pagination').style.display = 'none';
+      return;
+    }
+
+    document.getElementById('logTableBody').innerHTML = slice.map((l, i) => {
+      const isDup = l.result === 'DUP' || l.isDuplicate;
+      const resClass = isDup ? 'dup' : (l.result === 'OK' ? 'ok' : 'ng');
+      const resLabel = resultLabelOf(l);
+      const t = new Date(l.timestamp).toLocaleString('ja-JP', {
+        month:'2-digit', day:'2-digit',
+        hour:'2-digit', minute:'2-digit', second:'2-digit'
+      });
+      const rule = l.matchedRule
+        ? `[${l.matchedRule.minLen}-${l.matchedRule.maxLen}] s${l.matchedRule.startPos} c${l.matchedRule.charCount}${l.matchedRule.prefix ? ' p:'+l.matchedRule.prefix : ''}`
+        : '—';
+      const qr1short = (l.qr1 || '').slice(0, 30) + ((l.qr1||'').length > 30 ? '…' : '');
+      const qr2short = (l.qr2 || '').slice(0, 30) + ((l.qr2||'').length > 30 ? '…' : '');
+      const detailText = formatOrderDetailLogText(l);
+      return `
+        <tr onclick="openModal(${start + i})">
+          <td class="td-time">${t}</td>
+          <td><span class="result-badge ${resClass}">${resLabel}</span></td>
+          <td class="td-part">${escHtml(personLabel(l))}</td>
+          <td class="td-part">${escHtml(l.partNumber || '—')}</td>
+          <td class="td-qr">${escHtml(qr1short)}</td>
+          <td class="td-qr">${escHtml(qr2short)}</td>
+          <td style="color:var(--text3)">${l.qr1Length ?? l.qr2Length ?? '—'}</td>
+          <td class="td-qr">${escHtml(detailText)}</td>
+          <td><span class="rule-text">${escHtml(rule)}</span></td>
+        </tr>`;
+    }).join('');
+
+    // ページネーション
+    const pag = document.getElementById('pagination');
+    pag.style.display = 'flex';
+    document.getElementById('pageInfo').textContent =
+      `${start+1}–${Math.min(start+perPage, total)} / ${total}件`;
+
+    const btns = document.getElementById('pageBtns');
+    const pages = buildPageNums(currentPage, totalPages);
+    btns.innerHTML = [
+      `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage<=1?'disabled':''}>‹</button>`,
+      ...pages.map(p => p === '…'
+        ? `<span style="color:var(--text3);padding:0 4px">…</span>`
+        : `<button class="page-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`
+      ),
+      `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage>=totalPages?'disabled':''}>›</button>`
+    ].join('');
+  }
+
+  function buildPageNums(cur, total) {
+    if (total <= 7) return Array.from({length:total},(_,i)=>i+1);
+    const pages = [];
+    if (cur <= 4) {
+      pages.push(1,2,3,4,5,'…',total);
+    } else if (cur >= total-3) {
+      pages.push(1,'…',total-4,total-3,total-2,total-1,total);
+    } else {
+      pages.push(1,'…',cur-1,cur,cur+1,'…',total);
+    }
+    return pages;
+  }
+
+  function goPage(p) {
+    const total = Math.ceil(filteredLogs.length / perPage);
+    if (p < 1 || p > total) return;
+    currentPage = p;
+    renderTable();
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  // ── 詳細モーダル ──
+  function openModal(idx) {
+    const l = filteredLogs[idx];
+    if (!l) return;
+    const isDup = l.result === 'DUP' || l.isDuplicate;
+    const resClass = isDup ? 'dup' : (l.result === 'OK' ? 'ok' : 'ng');
+    const resLabel = resultLabelOf(l);
+
+    document.getElementById('modalTitle').innerHTML =
+      `照合詳細 <span class="result-badge ${resClass}">${resLabel}</span>`;
+
+    const rule = l.matchedRule
+      ? `[${l.matchedRule.minLen}-${l.matchedRule.maxLen}] start=${l.matchedRule.startPos} count=${l.matchedRule.charCount}${l.matchedRule.prefix ? ' prefix="'+l.matchedRule.prefix+'"' : ''}`
+      : '(ルールなし)';
+    const detailQrText = l.qr1_raw || l.qr1 || '';
+    const destinationCode = l.orderDetailDestinationCode || parseToyotaDestinationCodeFromText(detailQrText) || '—';
+    const receivingCode = l.orderDetailReceivingCode || parseToyotaReceivingCodeFromText(detailQrText) || '—';
+
+    // 誰が読み、誰が解除したかを追えるようにする。
+    // 解除ログ(ERROR_RELEASE)では処置者、通常の読み取りでは作業者が入る。
+    const worker = l.workerName || l.operatorName || '—';
+    const resolver = l.resolverName || '—';
+
+    const rows = [
+      ['日時',         new Date(l.timestamp).toLocaleString('ja-JP')],
+      ['作業者',       worker],
+      ['処置者',       resolver],
+      ['抽出品番',     l.partNumber || '—'],
+      ['1回目QR(raw)', l.qr1_raw || '—'],
+      ['2回目QR(raw)', l.qr2_raw || '—'],
+      ['1回目QR(正規化)', l.qr1 || '—'],
+      ['2回目QR(正規化)', l.qr2 || '—'],
+      ['QR1文字数',    l.qr1Length ?? '—'],
+      ['QR2文字数',    l.qr2Length ?? '—'],
+      ['適用ルール',   rule],
+      ['note',         l.extractNote || '—'],
+      ['明細セッション', l.orderDetailSessionId || '—'],
+      ['明細結果',      l.orderDetailResult || l.orderDetailReadResult || '—'],
+      ['明細メモ',      l.orderDetailNote || l.orderDetailAction || '—'],
+      ['納入先コード',  destinationCode],
+      ['受入',          receivingCode],
+      ['明細進捗',      l.orderDetailRequiredBoxes ? `${l.orderDetailScannedBoxes ?? 0}/${l.orderDetailRequiredBoxes}` : '—'],
+      ['明細完了',      l.orderDetailCompleted ? 'YES' : '—'],
+      ['重複タイプ',   isDup ? `${dupLabelOf(l)}（${l.dupType || '—'}）` : '—'],
+    ];
+
+    const contextLogs = logContextRows(l);
+    const contextHtml = contextLogs.length ? `
+      <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">同一明細の前後ログ</div>
+        ${contextLogs.map(item => {
+          const active = item.firebaseKey === l.firebaseKey || item.logId === l.logId;
+          const time = new Date(item.timestamp).toLocaleString('ja-JP');
+          const branch = String(item.qr2_raw || item.qr2 || '').match(/(?:^|\s)(\d{3,6})(?=\s|$)/)?.[1] || '—';
+          return `<div style="padding:8px 10px;margin-top:4px;border-radius:6px;background:${active ? '#e8f3ff' : '#f6f8fa'};font-family:var(--mono);font-size:12px;">
+            ${escHtml(time)} / ${escHtml(item.partNumber || '—')} / 枝番 ${escHtml(branch)} / ${escHtml(resultLabelOf(item))}
+          </div>`;
+        }).join('')}
+      </div>` : '';
+
+    document.getElementById('modalBody').innerHTML = rows.map(([k,v]) => `
+      <div class="modal-row">
+        <div class="modal-key">${escHtml(k)}</div>
+        <div class="modal-val">${escHtml(String(v))}</div>
+      </div>
+    `).join('') + contextHtml;
+
+    document.getElementById('modalOverlay').classList.add('show');
+  }
+
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('show');
+  }
+  function closeModalOnBg(e) {
+    if (e.target === document.getElementById('modalOverlay')) closeModal();
+  }
+
+  // ── CSV出力 ──
+  function csvDateTime(timestamp) {
+    const date = new Date(timestamp);
+    if (!Number.isFinite(date.getTime())) return ['', ''];
+    const iso = new Date(date.getTime() + 9 * 3600000).toISOString();
+    return [iso.slice(0, 10), iso.slice(11, 19)];
+  }
+
+  function buildCsvOrderIdentity(logs, sessions) {
+    const normalize = value => String(value || '').trim().replace(/\s+/g, ' ');
+    const qrSessions = new Map();
+    const hashSessions = new Map();
+    const hashQr = value => {
+      const text = String(value || '').normalize('NFKC')
+        .replace(/[\u200B\u200C\u200D\uFEFF\u00AD]/g, '')
+        .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFE58\uFE63]/g, '-')
+        .replace(/\u00A0/g, ' ').replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim()
+        .replace(/[\x00-\x1F\x7F]/g, '');
+      let hash = 2166136261;
+      for (let i = 0; i < text.length; i++) { hash ^= text.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+      return (hash >>> 0).toString(36);
+    };
+    sessions.forEach(session => {
+      (session.details || []).forEach(detail => {
+        if (!detail.qrHash || !session.sessionId) return;
+        if (!hashSessions.has(detail.qrHash)) hashSessions.set(detail.qrHash, new Set());
+        hashSessions.get(detail.qrHash).add(session.sessionId);
+      });
+      [session.orderQr, ...(session.details || []).map(d => d.orderQr)].forEach(qr => {
+        const key = normalize(qr);
+        if (!key || !session.sessionId) return;
+        if (!qrSessions.has(key)) qrSessions.set(key, new Set());
+        qrSessions.get(key).add(session.sessionId);
+      });
+    });
+    return new Map(logs.map(log => {
+      const qr = normalize(log.qr1_raw || log.qr1);
+      const hash = log.orderDetailQrHash || (qr ? hashQr(log.qr1_raw || log.qr1) : '');
+      const matches = qrSessions.get(qr) || hashSessions.get(hash);
+      const sessionId = log.orderDetailSessionId || (matches?.size === 1 ? [...matches][0] : '');
+      return [log, { sessionId, qrHash: hash, key: sessionId ? 'session:' + sessionId : qr ? 'qr:' + qr : '', fallback: !sessionId }];
+    }));
+  }
+
+  function buildOrderLeadTimes(logs, identities = buildCsvOrderIdentity(logs, [])) {
+    const result = new Map();
+    const workers = new Map();
+    for (const log of logs) {
+      if (log.partNumber !== 'ORDER_DETAIL') continue;
+      const worker = String(log.workerName || log.operatorName || '').trim();
+      const time = Date.parse(log.timestamp);
+      const status = (log.orderDetailReadResult || log.result) !== 'OK' ? '読込成功以外'
+        : !worker ? '作業者なし' : !identities.get(log)?.key ? '明細セッション・QRなし'
+        : !Number.isFinite(time) ? '日時不正' : '';
+      if (status) { result.set(log, { status }); continue; }
+      if (!workers.has(worker)) workers.set(worker, []);
+      workers.get(worker).push(log);
+    }
+    for (const entries of workers.values()) {
+      entries.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+      let previous = null;
+      for (const log of entries) {
+        if (previous && (identities.get(previous).key === identities.get(log).key || log.extractNote === 'order_detail_duplicate_ignored')) {
+          result.set(log, { status: '同一明細の再読込' });
+          continue;
+        }
+        if (previous) {
+          const seconds = (Date.parse(log.timestamp) - Date.parse(previous.timestamp)) / 1000;
+          result.set(previous, identities.get(previous).fallback || identities.get(log).fallback
+            ? { status: '明細セッション不明・まとめ読み判定不可' }
+            : seconds > 0
+            ? { seconds, next: log.timestamp, status: '算出済' }
+            : { status: '同時刻の別明細・要確認' });
+        }
+        result.set(log, { status: '取得範囲内に次の別明細なし' });
+        previous = log;
+      }
+    }
+    return result;
+  }
+
+  function csvLeadDuration(seconds) {
+    if (!Number.isFinite(seconds)) return '';
+    const value = Math.floor(seconds);
+    return [Math.floor(value / 3600), Math.floor(value / 60) % 60, value % 60]
+      .map(n => String(n).padStart(2, '0')).join(':');
+  }
+
+  function applyCombinedDetailLeadTimes(logs, sessions, identities, leadTimes) {
+    const sessionMap = new Map(sessions.map(s => [s.sessionId, s]));
+    const groupResults = new Map();
+    const lastOrderCompletion = (session, start, latestRead = start) => {
+      const basis = '当日最後・明細完了まで';
+      const lines = (Array.isArray(session.lines) ? session.lines : Object.values(session.lines || {})).filter(l => !l.excluded);
+      const end = Date.parse(session.completedAt);
+      if (!Number.isFinite(start) || !Number.isFinite(latestRead)) return { basis, status: '明細読込日時不足・算出不可' };
+      if (!lines.length || !lines.every(l => Number.isFinite(Number(l.requiredBoxes)) && Number(l.requiredBoxes) > 0 && Number.isFinite(Number(l.scanned)) && Number(l.scanned) >= Number(l.requiredBoxes)) || !Number.isFinite(end)) {
+        return { basis, status: '当日最後・未完了または完了記録なし' };
+      }
+      if (end < latestRead) return { basis, status: '読込・完了日時の不整合' };
+      return { basis, seconds: (end - start) / 1000, start: new Date(start).toISOString(), end: new Date(end).toISOString(), status: '算出済（当日最後・完了時刻まで）' };
+    };
+    for (const log of logs) {
+      if (log.partNumber !== 'ORDER_DETAIL' || (log.orderDetailReadResult || log.result) !== 'OK') continue;
+      const session = sessionMap.get(identities.get(log)?.sessionId);
+      if (!session || !(session.details || []).length) {
+        leadTimes.set(log, { status: '明細情報不足・まとめ読み判定不可' });
+        continue;
+      }
+      if (session.details.length <= 1) {
+        const lead = leadTimes.get(log);
+        if (lead && (lead.status === '取得範囲内に次の別明細なし' ||
+          (Number.isFinite(lead.seconds) && lead.next && csvDateTime(lead.next)[0] !== csvDateTime(log.timestamp)[0]))) {
+          leadTimes.set(log, lastOrderCompletion(session, Date.parse(log.timestamp)));
+        }
+        continue;
+      }
+      if (!groupResults.has(session.sessionId)) {
+        const basis = 'まとめ読込から次明細開始まで';
+        const times = session.details.map(d => Date.parse(d.readAt));
+        const lines = (Array.isArray(session.lines) ? session.lines : Object.values(session.lines || {}))
+          .filter(line => !line.excluded);
+        const end = Date.parse(session.completedAt);
+        const completed = Number.isFinite(end) && lines.length > 0 && lines.every(line =>
+          Number.isFinite(Number(line.requiredBoxes)) && Number(line.requiredBoxes) > 0 &&
+          Number.isFinite(Number(line.scanned)) && Number(line.scanned) >= Number(line.requiredBoxes));
+        let result;
+        if (times.some(time => !Number.isFinite(time))) {
+          result = { basis, status: '明細読込日時不足・算出不可' };
+        } else if (completed && end < Math.max(...times)) {
+          result = { basis, status: '読込・完了日時の不整合' };
+        } else {
+          const start = Math.min(...times);
+          const nextAfter = completed ? end : Math.max(...times);
+          const workerOf = item => String(item.workerName || item.operatorName || '').trim();
+          const participants = new Set(logs.filter(item =>
+            identities.get(item)?.sessionId === session.sessionId && item.result === 'OK' &&
+            (item.partNumber === 'ORDER_DETAIL' || item.qr2_raw || item.qr2) &&
+            Date.parse(item.timestamp) >= start && (!completed || Date.parse(item.timestamp) <= end)
+          ).map(workerOf).filter(Boolean));
+          const next = logs.filter(item =>
+            item.partNumber === 'ORDER_DETAIL' && (item.orderDetailReadResult || item.result) === 'OK' &&
+            item.extractNote !== 'order_detail_duplicate_ignored' &&
+            participants.has(workerOf(item)) && Date.parse(item.timestamp) >= nextAfter &&
+            identities.get(item)?.sessionId !== session.sessionId
+          ).sort((a,b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))[0];
+          if (!participants.size) {
+            result = { basis, status: '取得範囲内で担当作業者を特定不可' };
+          } else if (!next || csvDateTime(next.timestamp)[0] !== csvDateTime(Math.max(...times))[0]) {
+            result = lastOrderCompletion(session, start, Math.max(...times));
+          } else if (!identities.get(next)?.sessionId) {
+            result = { basis, status: '次明細のセッション不明・算出不可' };
+          } else {
+            const nextTime = Date.parse(next.timestamp);
+            result = {
+              seconds: (nextTime - start) / 1000,
+              start: new Date(start).toISOString(), end: new Date(nextTime).toISOString(),
+              next: next.timestamp,
+              basis, status: completed ? '算出済（担当作業者の最初の次明細読込）' : '算出済（未完了または完了記録なし・次明細開始まで）'
+            };
+          }
+        }
+        groupResults.set(session.sessionId, result);
+      }
+      leadTimes.set(log, groupResults.get(session.sessionId));
+    }
+    return leadTimes;
+  }
+
+  function buildCsvSessionCustomers(logs, sessions) {
+    const result = new Map();
+    const add = (sessionId, id) => {
+      if (!sessionId || !id) return;
+      if (!result.has(sessionId)) result.set(sessionId, new Set());
+      result.get(sessionId).add(id);
+    };
+    sessions.forEach(session => getOrderCustomerIds(session).forEach(id => add(session.sessionId, id)));
+    logs.forEach(log => {
+      if (log.partNumber === 'ORDER_DETAIL' && log.result === 'OK') {
+        add(log.orderDetailSessionId, logCustomerId(log));
+      }
+    });
+    return result;
+  }
+
+  function csvWorkPauseTimes(log, lead, logs, identities) {
+    if (!Number.isFinite(lead.seconds)) return ['', '', ''];
+    const start = Date.parse(lead.start || log.timestamp);
+    const end = Date.parse(lead.end || lead.next);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return ['', '', ''];
+    const worker = log.workerName || log.operatorName || '';
+    const sessionId = identities.get(log)?.sessionId;
+    const pauses = new Map();
+    for (const event of logs) {
+      if (!sessionId || event.orderDetailSessionId !== sessionId ||
+          (event.workerName || event.operatorName || '') !== worker || !event.workPauseId || event.result !== 'OK') continue;
+      if (event.orderDetailAction !== 'PAUSE' && event.orderDetailAction !== 'RESUME') continue;
+      const from = Date.parse(event.workPauseStartedAt);
+      const until = event.orderDetailAction === 'RESUME' ? Date.parse(event.timestamp) : Infinity;
+      if (!Number.isFinite(from) || Number.isNaN(until) || until < from) continue;
+      const old = pauses.get(event.workPauseId);
+      pauses.set(event.workPauseId, { from, until: Math.min(old?.until ?? Infinity, until) });
+    }
+    // 重送・重なった中断区間は一度だけ差し引く。
+    const intervals = [...pauses.values()].map(p => [Math.max(start, p.from), Math.min(end, p.until)])
+      .filter(([a,b]) => b > a).sort((a,b) => a[0] - b[0]);
+    let pausedMs = 0, previousEnd = start;
+    for (const [a,b] of intervals) {
+      pausedMs += Math.max(0, b - Math.max(a, previousEnd));
+      previousEnd = Math.max(previousEnd, b);
+    }
+    return [csvLeadDuration(pausedMs / 1000), csvLeadDuration(Math.max(0, lead.seconds - pausedMs / 1000)),
+      intervals.length ? '当該作業者の中断記録を除外' : '中断記録なし（待機時間を含む）'];
+  }
+
+  async function exportCSV() {
+    if (!activeCompany) { alert('会社を選択してください'); return; }
+    if (filteredLogs.length === 0) { alert('出力するデータがありません'); return; }
+    const company = { ...activeCompany };
+    const exportLogs = [...filteredLogs];
+    const sourceLogs = [...allLogs];
+    const sessions = [...orderSessions];
+    let master;
+    try {
+      master = (await database.ref('qr_match_companies/customer_name_master/' + company.id).once('value')).val() || {};
+      const knownIds = buildCsvOrderIdentity(exportLogs, sessions);
+      const ids = new Set(exportLogs.filter(l => l.partNumber === 'ORDER_DETAIL').map(l => knownIds.get(l)?.sessionId).filter(Boolean));
+      for (const id of ids) {
+        const data = (await database.ref('qr_match_companies/order_detail_sessions/' + company.id + '/' + id).once('value')).val();
+        if (!data) continue;
+        const fresh = { ...data, sessionId: id, details: Array.isArray(data.details) ? data.details : Object.values(data.details || {}) };
+        const index = sessions.findIndex(s => s.sessionId === id);
+        if (index < 0) sessions.push(fresh); else sessions[index] = fresh;
+      }
+    } catch (err) {
+      alert('顧客名マスタまたは明細実績を取得できないためCSV出力を中止しました。再度お試しください。');
+      return;
+    }
+    const identities = buildCsvOrderIdentity(sourceLogs, sessions);
+    const combinedSessionIds = new Set(sessions.filter(s => (s.details || []).length > 1).map(s => s.sessionId));
+    const sessionCustomers = buildCsvSessionCustomers(sourceLogs, sessions);
+    const leadTimes = applyCombinedDetailLeadTimes(sourceLogs, sessions, identities, buildOrderLeadTimes(sourceLogs, identities));
+    const headers = ['日にち','時間','作業者','処置者','顧客ID','顧客名','結果','重複','抽出品番','1回目QR(raw)','2回目QR(raw)','1回目QR(正規化)','2回目QR(正規化)','QR1文字数','QR2文字数','ルール','note','明細区分','明細セッション','所要時間','所要時間(秒)','次明細読込日','次明細読込時間','所要時間算出状況','所要時間基準','計算開始日','計算開始時間','計算終了日','計算終了時間','明細結果','明細メモ','納入先コード','受入','明細完了','明細必要','明細読込'];
+    headers.push('中断時間', '実作業時間(中断除外)', '実作業時間算出状況');
+    const rows = exportLogs.map(l => {
+      const isDup = l.result === 'DUP' || l.isDuplicate;
+      const rule = l.matchedRule ? JSON.stringify(l.matchedRule) : '';
+      const detailQrText = l.qr1_raw || l.qr1 || '';
+      const directCustomer = logCustomerId(l);
+      const ids = directCustomer ? [directCustomer] : [...(sessionCustomers.get(l.orderDetailSessionId) || [])];
+      const customerId = ids.length === 1 ? ids[0] : '';
+      const customerName = customerId ? (master[customerId] || 'マスタ未登録')
+        : ids.length > 1 ? '複数顧客のため特定不可' : '顧客不明';
+      const lead = leadTimes.get(l) || {};
+      return [
+        ...csvDateTime(l.timestamp),
+        l.workerName || l.operatorName || '',
+        l.resolverName || '',
+        customerId, customerName,
+        isDup ? 'DUP' : (l.result || ''),
+        isDup ? dupLabelOf(l) : '',
+        l.partNumber ?? '',
+        l.qr1_raw ?? '', l.qr2_raw ?? '',
+        l.qr1 ?? '', l.qr2 ?? '',
+        l.qr1Length ?? '', l.qr2Length ?? '',
+        rule, l.extractNote ?? '',
+        combinedSessionIds.has(identities.get(l)?.sessionId) ? '明細まとめ' : identities.get(l)?.sessionId ? '単独明細' : '判定不可',
+        identities.get(l)?.sessionId || '',
+        csvLeadDuration(lead.seconds), lead.seconds ?? '',
+        ...csvDateTime(lead.next), lead.status || '',
+        lead.status ? (lead.basis || '次の別明細読込まで') : '',
+        ...csvDateTime(lead.status ? (lead.start || l.timestamp) : undefined),
+        ...csvDateTime(lead.end || lead.next),
+        l.orderDetailResult ?? l.orderDetailReadResult ?? '',
+        l.orderDetailNote ?? l.orderDetailAction ?? '',
+        l.orderDetailDestinationCode || parseToyotaDestinationCodeFromText(detailQrText) || '',
+        l.orderDetailReceivingCode || parseToyotaReceivingCodeFromText(detailQrText) || '',
+        l.orderDetailCompleted ?? '',
+        l.orderDetailRequiredBoxes ?? '',
+        l.orderDetailScannedBoxes ?? '',
+        ...csvWorkPauseTimes(l, lead, sourceLogs, identities)
+      ];
+    });
+
+    const csv = [headers, ...rows]
+      .map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))
+      .join('\n');
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type:'text/csv' }));
+    a.download = `QR照合ログ_${company.name}_${getTodayJst()}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, m =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+  function escJs(s) {
+    return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
+  }
+</script>
+</body>
+</html>

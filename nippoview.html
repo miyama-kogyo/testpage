@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
@@ -263,6 +263,7 @@
         <select class="filter-input" id="filter-type">
           <option value="">すべて</option>
           <option value="通常検査">通常検査</option>
+          <option value="__NON_NORMAL__">通常検査以外</option>
           <option value="F">F - 初期流動</option>
           <option value="S">S - 選別</option>
           <option value="K">K - 工程変更</option>
@@ -271,6 +272,14 @@
           <option value="G">G - 外観検査</option>
           <option value="R">R - 穴バリ検査</option>
           <option value="Z">Z - 画像検査+梱包</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">製品マスター登録</label>
+        <select class="filter-input" id="filter-master-registration">
+          <option value="">すべて</option>
+          <option value="registered">あり</option>
+          <option value="unregistered">なし</option>
         </select>
       </div>
     </div>
@@ -282,6 +291,7 @@
       <button class="btn btn-primary" onclick="applyFilters()">絞り込み</button>
       <button class="btn btn-secondary" onclick="clearFilters()">クリア</button>
       <button class="btn btn-success" onclick="exportCSV()">CSV出力</button>
+      <button class="btn btn-success" onclick="exportCSV('registeredMaster')">CSV出力（マスター登録あり）</button>
     </div>
   </div>
 
@@ -649,7 +659,11 @@ function initApp() {
   db.collection('productMaster').onSnapshot(snapshot => {
     master = {};
     snapshot.forEach(doc => {
-      master[doc.id] = doc.data().ngItems || [];
+      const data = doc.data();
+      master[doc.id] = {
+        ngItems: data.ngItems || [],
+        isRegisteredMaster: data.isRegisteredMaster !== false
+      };
     });
     updateProductFilter();
     updateCols();
@@ -696,33 +710,46 @@ function updateProductFilter() {
 
 function updateCols() {
   cols.clear();
-  Object.values(master).forEach(items => {
-    items.forEach(item => {
+  Object.values(master).forEach(productData => {
+    (productData.ngItems || []).forEach(item => {
       cols.set(item.code, item.name);
     });
   });
 }
 
 /* ▼ 絞り込み・統計更新 */
+function isProductMasterRegistered(code) {
+  return !!(code && master[code] && master[code].isRegisteredMaster !== false);
+}
+
+function getInspectionType(item) {
+  return (item.it2 && item.it2.trim()) ? item.it2.trim() : '通常検査';
+}
+
+function matchesInspectionType(item, type) {
+  const itemType = getInspectionType(item);
+  if (!type) return true;
+  if (type === '__NON_NORMAL__') return itemType !== '通常検査';
+  return itemType === type;
+}
+
 function applyFilters() {
   const startDate = document.getElementById('filter-start-date').value;
   const endDate = document.getElementById('filter-end-date').value;
   const product = document.getElementById('filter-product').value;
   const type = document.getElementById('filter-type').value;
+  const masterRegistration = document.getElementById('filter-master-registration').value;
   
   filteredData = allData.filter(item => {
     const itemDate = item.pd.replace(/\//g, '-');
+    const registeredMaster = isProductMasterRegistered(item.on);
     
     if (startDate && itemDate < startDate) return false;
     if (endDate && itemDate > endDate) return false;
     if (product && item.on !== product) return false;
-    if (type) {
-      if (type === '通常検査') {
-        if (item.it2 && item.it2 !== '') return false;
-      } else {
-        if (item.it2 !== type) return false;
-      }
-    }
+    if (!matchesInspectionType(item, type)) return false;
+    if (masterRegistration === 'registered' && !registeredMaster) return false;
+    if (masterRegistration === 'unregistered' && registeredMaster) return false;
     
     return true;
   });
@@ -744,6 +771,7 @@ function clearFilters() {
   document.getElementById('filter-end-date').value = today.toISOString().split('T')[0];
   document.getElementById('filter-product').value = '';
   document.getElementById('filter-type').value = '';
+  document.getElementById('filter-master-registration').value = '';
   applyFilters();
 }
 
@@ -1130,8 +1158,38 @@ function renderTable() {
 }
 
 /* ▼ CSV出力 */
-function exportCSV() {
-  if (filteredData.length === 0) {
+function getCSVTargetData(mode) {
+  if (mode === 'registeredMaster') {
+    return filteredData.filter(item => isProductMasterRegistered(item.on));
+  }
+  return filteredData;
+}
+
+function getCSVFileName(mode) {
+  const dateText = new Date().toISOString().split('T')[0];
+  if (mode === 'registeredMaster') return 'inspection_data_registered_master_' + dateText + '.csv';
+  return 'inspection_data_' + dateText + '.csv';
+}
+
+function getCSVInspectionType(item) {
+  const type = (item.it2 || '').trim();
+  const typeNames = {
+    F: '初期流動',
+    S: '選別',
+    K: '工程変更',
+    C: '新人Wチェック',
+    H: '箱詰め',
+    G: '外観検査',
+    R: '穴バリ検査',
+    Z: '画像検査＋梱包'
+  };
+  if (!type || type === '通常検査') return '';
+  return typeNames[type] || type;
+}
+
+function exportCSV(mode) {
+  const targetData = getCSVTargetData(mode);
+  if (targetData.length === 0) {
     alert('エクスポートするデータがありません');
     return;
   }
@@ -1140,7 +1198,7 @@ function exportCSV() {
   const ngCols = Array.from(cols.keys()).sort();
   const allHeaders = headers.concat(ngCols).concat(['備考']);
   
-  const rows = filteredData.map(item => {
+  const rows = targetData.map(item => {
     const inspectorInfo = item.inspectors ? 
       item.inspectors.map(ins => {
         if (ins.timePeriods && ins.timePeriods.length > 0) {
@@ -1163,7 +1221,7 @@ function exportCSV() {
       item.ic || '0', 
       item.totalTime || '0', 
       item.ln || '', 
-      item.it2 || '通常検査', 
+      getCSVInspectionType(item),
       inspectorInfo
     ];
     
@@ -1181,7 +1239,7 @@ function exportCSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'inspection_data_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.download = getCSVFileName(mode);
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1293,7 +1351,8 @@ function updateDefectTrend() {
     emptyEl.style.display = 'none';
   }
 
-  const defectCounts = labels.map(k => bucketMap.get(k).defects);
+  const defectCounts     = labels.map(k => bucketMap.get(k).defects);
+  const inspectionCounts = labels.map(k => bucketMap.get(k).inspection);
   const defectRates  = labels.map(k => {
     const b = bucketMap.get(k);
     return b.inspection > 0 ? +(b.defects / b.inspection * 100).toFixed(2) : 0;
@@ -1351,6 +1410,19 @@ function updateDefectTrend() {
           backgroundColor: 'rgba(37,99,235,0.2)',
           pointBackgroundColor: lineColors,
           pointBorderColor: lineColors
+        },
+        {
+          type: 'line',
+          label: '検査数（個）',
+          data: inspectionCounts,
+          yAxisID: 'y2',
+          tension: 0.2,
+          pointRadius: 3,
+          borderColor: 'rgba(16,185,129,1)',
+          backgroundColor: 'rgba(16,185,129,0.1)',
+          borderDash: [5, 4],
+          pointBackgroundColor: 'rgba(16,185,129,1)',
+          pointBorderColor: 'rgba(16,185,129,1)'
         }
       ]
     },
@@ -1383,6 +1455,13 @@ function updateDefectTrend() {
           title: { display: true, text: '不良率（％）' },
           beginAtZero: true,
           grid: { drawOnChartArea: false }
+        },
+        y2: {
+          position: 'right',
+          title: { display: true, text: '検査数（個）' },
+          beginAtZero: true,
+          grid: { drawOnChartArea: false },
+          offset: true
         }
       },
       plugins: {
@@ -1398,8 +1477,10 @@ function updateDefectTrend() {
             label: function(context){
               if (context.datasetIndex === 0) {
                 return `不良数: ${context.parsed.y}個`;
-              } else {
+              } else if (context.datasetIndex === 1) {
                 return `不良率: ${context.parsed.y.toFixed(2)}%`;
+              } else {
+                return `検査数: ${context.parsed.y.toLocaleString()}個`;
               }
             }
           }
@@ -1528,3 +1609,4 @@ function updateDefectTrend() {
 </script>
 </body>
 </html>
+
