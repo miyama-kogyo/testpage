@@ -62,6 +62,23 @@ async function handleCapturedQr(qr) {
   }
 }
 
+async function openWorkspace(tab,bounds) {
+  if (!tab?.id) throw Error('起動元のタブを確認できません。');
+  const left = Number.isFinite(Number(bounds?.left)) ? Math.round(Number(bounds.left)) : 0;
+  const top = Number.isFinite(Number(bounds?.top)) ? Math.round(Number(bounds.top)) : 0;
+  const width = Math.max(1000,Math.round(Number(bounds?.width) || 1600));
+  const height = Math.max(640,Math.round(Number(bounds?.height) || 900));
+  const gap = 8;
+  const leftWidth = Math.floor((width-gap)/2);
+  const rightWidth = width-gap-leftWidth;
+  const completionUrl = 'https://miyama-kogyo.github.io/testpage/order_completion.html';
+  const ediUrl = 'https://www.toyotawg-edi.jp/400259565-01/outboundQrAll.do?command=executeInit&ViewAllMode=1';
+  await chrome.windows.create({tabId:tab.id,type:'popup',left,top,width:leftWidth,height});
+  await chrome.tabs.update(tab.id,{url:completionUrl});
+  await chrome.windows.create({url:ediUrl,type:'popup',left:left+leftWidth+gap,top,width:rightWidth,height});
+  return {ok:true};
+}
+
 chrome.runtime.onMessage.addListener((message,sender,sendResponse) => {
   const tabId = sender.tab?.id;
   if (!tabId) return false;
@@ -81,6 +98,10 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse) => {
   if (message?.type === 'EDI_QR_CAPTURED') {
     const qr = normalizeQr(message.qr);
     handleCapturedQr(qr).then(sendResponse).catch(error => sendResponse({ok:false,matched:false,error:error.message}));
+    return true;
+  }
+  if (message?.type === 'OPEN_WORKSPACE') {
+    openWorkspace(sender.tab,message.bounds).then(sendResponse).catch(error => sendResponse({ok:false,error:error.message}));
     return true;
   }
   return false;
