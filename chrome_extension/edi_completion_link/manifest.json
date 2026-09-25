@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ミヤマ 完納・EDI連携",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "トヨタWG共通EDIで読み取った明細QRを完納処理待ちへ連携します。",
   "permissions": ["tabs"],
   "host_permissions": [

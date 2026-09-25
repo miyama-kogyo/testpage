@@ -3,6 +3,16 @@
 const pendingRequests = new Map();
 let latestState = null;
 
+function sendRuntimeMessage(message) {
+  try {
+    if (!chrome.runtime?.id) return;
+    const request = chrome.runtime.sendMessage(message);
+    if (request && typeof request.catch === 'function') request.catch(() => {});
+  } catch (_) {
+    // The current content script becomes invalid when an unpacked extension is reloaded.
+  }
+}
+
 window.addEventListener('message',event => {
   if (event.source !== window || event.origin !== location.origin || event.data?.source !== 'miyama-order-completion') return;
   if (event.data.type === 'pending-state') {
@@ -10,7 +20,7 @@ window.addEventListener('message',event => {
       company:event.data.company,
       items:event.data.items
     };
-    chrome.runtime.sendMessage({type:'COMPLETION_STATE',...latestState}).catch(() => {});
+    sendRuntimeMessage({type:'COMPLETION_STATE',...latestState});
     return;
   }
   if (event.data.type === 'mark-result') {
