@@ -9,6 +9,8 @@ let db, online = false, generation = 0, query = null, items = [], master = {}, l
 let receiptRefs = [];
 let clickBlockedUntil = 0;
 let replayKey = '';
+let activeBatchKeys = [];
+const completionBatchSize = 10;
 const completionBridgeSource = 'miyama-order-completion';
 const receipts = new Map(), known = new Set(), saving = new Set();
 function message(text = '') { $('message').textContent = text; }
@@ -19,13 +21,20 @@ function destination(item) {
   return [name, m.destinationCode, m.receivingCode].filter(Boolean).join(' / ') || '未設定';
 }
 function pending(item) { return known.has(item.key) && receipts.get(item.key)?.status !== 'posted'; }
-function publishCompletionState() {
+function publishCompletionState(batch) {
   window.postMessage({
     source:completionBridgeSource,
     type:'pending-state',
     company:loadedCompany,
-    items:items.filter(item => !item.reason && pending(item)).map(item => ({key:item.key,qr:item.qr}))
+    items:batch.map(item => ({key:item.key,qr:item.qr}))
   },location.origin);
+}
+function activeBatch(list) {
+  const pendingKeys = new Set(list.map(item => item.key));
+  activeBatchKeys = activeBatchKeys.filter(key => pendingKeys.has(key));
+  if (!activeBatchKeys.length) activeBatchKeys = list.slice(0,completionBatchSize).map(item => item.key);
+  const activeKeys = new Set(activeBatchKeys);
+  return list.filter(item => activeKeys.has(item.key));
 }
 function postedItems() { return items.filter(item => known.has(item.key) && receipts.get(item.key)?.status === 'posted'); }
 function incompleteItems() { return $('showIncomplete').checked ? items.filter(item => item.incomplete && pending(item)) : []; }
@@ -59,7 +68,8 @@ function render() {
   if (replayKey && ![...postedItems(),...incompleteItems()].some(item => item.key === replayKey)) replayKey = '';
   const previewLabel = incompleteItems().some(item => item.key === replayKey) ? '未完了QR・確認用（完納処理対象外）' : '処理済みQR・再表示';
   $('replayLabel').textContent = previewLabel;
-  const shown = loading ? [] : replayKey ? items.filter(item => item.key === replayKey) : list;
+  const batch = loading ? [] : activeBatch(list);
+  const shown = replayKey ? items.filter(item => item.key === replayKey) : batch;
   $('replayBar').hidden = !replayKey;
   const visible = new Set(shown.map(item => item.key));
   $('grid').querySelectorAll('[data-key]').forEach(node => { if (!visible.has(node.dataset.key)) node.remove(); });
@@ -89,7 +99,7 @@ function render() {
     }
   }
   const reviewing = items.filter(item => item.reason && pending(item) && !incompleteItems().includes(item));
-  $('count').textContent = `未処理 ${list.length}枚`;
+  $('count').textContent = `未処理 ${list.length}枚 / この組 ${batch.length}枚`;
   $('review').hidden = !reviewing.length;
   $('reviewCount').textContent = `要確認 ${reviewing.length}枚`;
   $('reviewList').innerHTML = reviewing.map(item => `<li>${html(destination(item))} / ${html(item.orderNo || item.sessionId)}：${html(item.reason)}</li>`).join('');
@@ -98,7 +108,7 @@ function render() {
   }
   renderHistory();
   renderIncomplete();
-  publishCompletionState();
+  publishCompletionState(batch);
 }
 async function digest(text) {
   const bytes = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
@@ -113,7 +123,7 @@ async function load() {
   const serial = ++generation;
   const includeIncomplete = $('showIncomplete').checked;
   $('dateLabel').textContent = includeIncomplete ? '明細更新日・開始' : '照合完了日・開始';
-  query?.off(); detachReceipts(); items = []; receipts.clear(); known.clear(); loadedCompany = company; replayKey = '';
+  query?.off(); detachReceipts(); items = []; receipts.clear(); known.clear(); loadedCompany = company; replayKey = ''; activeBatchKeys = [];
   render(); message('明細を取得しています…');
   try {
     const names = await db.ref(`qr_match_companies/customer_name_master/${company}`).once('value');
