@@ -41,7 +41,7 @@
     if (command !== 'posted' || !context.document) return undefined;
     const prior = current || {};
     if (prior.status === 'posted') return undefined;
-    return { ...prior, ...context.document, status:'posted', postedAt:context.at, updatedAt:context.at, method:'qr_click' };
+    return { ...prior, ...context.document, status:'posted', postedAt:context.at, updatedAt:context.at, method:context.method || 'qr_click' };
   }
   const core = { documents, transition };
   if (typeof module !== 'undefined' && module.exports) module.exports = core;

@@ -9,6 +9,7 @@ let db, online = false, generation = 0, query = null, items = [], master = {}, l
 let receiptRefs = [];
 let clickBlockedUntil = 0;
 let replayKey = '';
+const completionBridgeSource = 'miyama-order-completion';
 const receipts = new Map(), known = new Set(), saving = new Set();
 function message(text = '') { $('message').textContent = text; }
 function ymd(value) { const s = String(value || ''); return /^\d{8}$/.test(s) ? `${s.slice(0,4)}/${s.slice(4,6)}/${s.slice(6)}` : s || '-'; }
@@ -18,6 +19,14 @@ function destination(item) {
   return [name, m.destinationCode, m.receivingCode].filter(Boolean).join(' / ') || '未設定';
 }
 function pending(item) { return known.has(item.key) && receipts.get(item.key)?.status !== 'posted'; }
+function publishCompletionState() {
+  window.postMessage({
+    source:completionBridgeSource,
+    type:'pending-state',
+    company:loadedCompany,
+    items:items.filter(item => !item.reason && pending(item)).map(item => ({key:item.key,qr:item.qr}))
+  },location.origin);
+}
 function postedItems() { return items.filter(item => known.has(item.key) && receipts.get(item.key)?.status === 'posted'); }
 function incompleteItems() { return $('showIncomplete').checked ? items.filter(item => item.incomplete && pending(item)) : []; }
 function renderIncomplete() {
@@ -89,6 +98,7 @@ function render() {
   }
   renderHistory();
   renderIncomplete();
+  publishCompletionState();
 }
 async function digest(text) {
   const bytes = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
@@ -142,9 +152,13 @@ async function load() {
     });
   } catch (error) { if (serial === generation) message('データを取得できません。'+error.message); }
 }
-async function post(key) {
+async function post(key,method = 'qr_click') {
+  if (method === 'edi_link' && saving.size) {
+    const deadline = Date.now() + 12000;
+    while (saving.size && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve,40));
+  }
   const item = items.find(item => item.key === key);
-  if (replayKey || !online || !item || item.reason || !pending(item) || saving.size || Date.now() < clickBlockedUntil) return;
+  if (replayKey || !online || !item || item.reason || !pending(item) || saving.size || (method === 'qr_click' && Date.now() < clickBlockedUntil)) return false;
   const company = loadedCompany, serial = generation;
   saving.add(key); $('load').disabled = true; $('company').disabled = true; $('showIncomplete').disabled = true; render();
   try {
@@ -155,15 +169,30 @@ async function post(key) {
     if (!online || serial !== generation) throw Error('接続が変わりました。処理状況を確認してください。');
     const result = await receiptRef(key).transaction(current => CompletionCore.transition(current,'posted',{
       at:firebase.database.ServerValue.TIMESTAMP,
+      method,
       document:{sessionId:item.sessionId,orderNo:item.orderNo,customerId:item.customerId,completedAt:item.completedAt,qrKey:key}
     }),undefined,false);
     if (!result.committed && result.snapshot.val()?.status !== 'posted') throw Error('保存結果を確認できません。');
     receipts.set(key,result.snapshot.val()); known.add(key); message();
     clickBlockedUntil = Date.now() + 700;
     setTimeout(render,710);
-  } catch (error) { message('処理済みの保存結果を確認できませんでした。QRを再読込せず、処理状況を確認してください。\n'+error.message); }
+    return true;
+  } catch (error) { message('処理済みの保存結果を確認できませんでした。QRを再読込せず、処理状況を確認してください。\n'+error.message); return false; }
   finally { saving.delete(key); $('load').disabled = !!saving.size; $('company').disabled = !!saving.size; $('showIncomplete').disabled = !!saving.size; render(); }
 }
+window.addEventListener('message',async event => {
+  const request = event.data;
+  if (event.source !== window || event.origin !== location.origin || request?.source !== 'miyama-edi-link' || request.type !== 'mark-posted') return;
+  const item = items.find(candidate => candidate.key === request.key && candidate.qr === request.qr && !candidate.reason && pending(candidate));
+  const ok = !!item && await post(item.key,'edi_link');
+  window.postMessage({
+    source:completionBridgeSource,
+    type:'mark-result',
+    requestId:String(request.requestId || ''),
+    ok,
+    error:ok ? '' : '対象QRを処理済みにできませんでした。完納処理待ち画面を確認してください。'
+  },location.origin);
+});
 async function init() {
   const today = new Date(Date.now()+9*3600000).toISOString().slice(0,10);
   $('dateFrom').value = today; $('dateTo').value = today;
