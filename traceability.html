@@ -31,7 +31,7 @@ dialog{max-height:94dvh}dialog header{position:sticky;top:0;background:white;z-i
 .summary{overflow-wrap:anywhere}header>a{white-space:nowrap;font-size:13px}
 }
 </style>
-<header><h1>かんばんトレーサビリティ</h1><a href="qrchecklog.html">照合ログ</a></header>
+<header><h1>かんばんトレーサビリティ</h1><a href="https://motsu922.github.io/testpage/qrchecklog.html">照合ログ</a></header>
 <main>
 <form id="filters">
 <label>照合会社<select id="company" required></select></label>
@@ -153,3 +153,5 @@ const jst=d=>new Date(d+9*3600000).toISOString().slice(0,10);$('to').value=jst(D
 (async()=>{try{await firebase.auth().signInAnonymously();const snap=await db.ref('qr_match_companies/profiles').once('value');const companies=Object.entries(snap.val()||{}).map(([id,c])=>({...c,id:c.id||id})).sort((a,b)=>(b.name==='ミヤマ')-(a.name==='ミヤマ')||String(a.name).localeCompare(b.name,'ja'));$('company').innerHTML=companies.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');if(!companies.length)throw Error('会社が登録されていません');await search();}catch(e){status('接続エラー：'+e.message,true);}})();
 </script>
 </html>
+
+
