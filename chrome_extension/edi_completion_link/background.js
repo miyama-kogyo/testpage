@@ -79,6 +79,24 @@ async function openWorkspace(tab,bounds) {
   return {ok:true};
 }
 
+async function transferFirstQr(completionTabId) {
+  let state = completionTabs.get(completionTabId);
+  if (!state?.items?.length) {
+    await refreshCompletionStates();
+    state = completionTabs.get(completionTabId);
+  }
+  const item = state?.items?.[0];
+  if (!item) throw Error('転送できる完納処理待ちQRがありません。');
+  const ediTabs = await chrome.tabs.query({url:'https://www.toyotawg-edi.jp/*/outboundQrAll.do*'});
+  if (ediTabs.length !== 1) throw Error(ediTabs.length ? 'EDIのQR読取画面を1つだけ開いてください。' : 'EDIのQR読取画面を開いてください。');
+  const response = await chrome.tabs.sendMessage(ediTabs[0].id,{
+    type:'FILL_EDI_QR_PROTOTYPE',
+    qr:item.qr
+  });
+  if (!response?.ok) throw Error(response?.error || 'EDIへ転送できませんでした。');
+  return {ok:true,index:response.index};
+}
+
 chrome.runtime.onMessage.addListener((message,sender,sendResponse) => {
   const tabId = sender.tab?.id;
   if (!tabId) return false;
@@ -102,6 +120,10 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse) => {
   }
   if (message?.type === 'OPEN_WORKSPACE') {
     openWorkspace(sender.tab,message.bounds).then(sendResponse).catch(error => sendResponse({ok:false,error:error.message}));
+    return true;
+  }
+  if (message?.type === 'TRANSFER_FIRST_QR') {
+    transferFirstQr(tabId).then(sendResponse).catch(error => sendResponse({ok:false,error:error.message}));
     return true;
   }
   return false;

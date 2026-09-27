@@ -1,6 +1,7 @@
 'use strict';
 
 const processedValues = new WeakMap();
+const directTransferValues = new WeakMap();
 let toastTimer = 0;
 
 function visible(element) {
@@ -60,17 +61,70 @@ async function complete(input,capturedValue) {
   }
 }
 
+function setNativeValue(input,value) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')?.set;
+  if (setter) setter.call(input,value);
+  else input.value = value;
+}
+
+function enterEvent(type) {
+  const event = new KeyboardEvent(type,{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true,cancelable:true});
+  if (event.keyCode !== 13) {
+    try { Object.defineProperties(event,{keyCode:{get:() => 13},which:{get:() => 13}}); } catch (_) {}
+  }
+  return event;
+}
+
+function isDirectTransfer(input) {
+  return directTransferValues.get(input) === String(input?.value || '').replace(/[\r\n]+$/g,'');
+}
+
+function fillPrototypeQr(qr) {
+  const inputs = qrInputs();
+  if (!inputs.length) throw Error('EDIのQR入力欄を検出できません。');
+  const target = inputs.find(input => !String(input.value || '').trim());
+  if (!target) throw Error('EDIのQR入力欄10件がすべて使用中です。');
+  const value = String(qr || '').replace(/[\r\n]+$/g,'');
+  if (!value) throw Error('転送するQRデータがありません。');
+  directTransferValues.set(target,value);
+  target.scrollIntoView({block:'center'});
+  target.focus({preventScroll:true});
+  setNativeValue(target,value);
+  let inputEvent;
+  try { inputEvent = new InputEvent('input',{bubbles:true,inputType:'insertText',data:value}); }
+  catch (_) { inputEvent = new Event('input',{bubbles:true}); }
+  target.dispatchEvent(inputEvent);
+  target.dispatchEvent(new Event('change',{bubbles:true}));
+  target.dispatchEvent(enterEvent('keydown'));
+  target.dispatchEvent(enterEvent('keypress'));
+  target.dispatchEvent(enterEvent('keyup'));
+  const index = inputs.indexOf(target)+1;
+  showStatus(`試作転送: ${index}件目へ入力しました。EDIの読取結果を確認してください。`,'warn');
+  return index;
+}
+
 document.addEventListener('keydown',event => {
-  if (event.key === 'Enter' && qrInputs().includes(event.target)) {
+  if (event.key === 'Enter' && !isDirectTransfer(event.target) && qrInputs().includes(event.target)) {
     const qr = event.target.value;
     setTimeout(() => complete(event.target,qr),0);
   }
 },true);
 document.addEventListener('change',event => {
-  if (qrInputs().includes(event.target)) complete(event.target);
+  if (!isDirectTransfer(event.target) && qrInputs().includes(event.target)) complete(event.target);
 },true);
 document.addEventListener('focusout',event => {
-  if (qrInputs().includes(event.target)) complete(event.target);
+  if (!isDirectTransfer(event.target) && qrInputs().includes(event.target)) complete(event.target);
 },true);
+
+chrome.runtime.onMessage.addListener((message,_sender,sendResponse) => {
+  if (message?.type !== 'FILL_EDI_QR_PROTOTYPE') return false;
+  try {
+    const index = fillPrototypeQr(message.qr);
+    sendResponse({ok:true,index});
+  } catch (error) {
+    sendResponse({ok:false,error:error.message});
+  }
+  return false;
+});
 
 showStatus(qrInputs().length >= 10 ? '完納・EDI連携 準備完了' : 'EDIのQR入力欄を確認中','warn');
