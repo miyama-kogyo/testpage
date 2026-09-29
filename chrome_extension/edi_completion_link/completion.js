@@ -27,10 +27,10 @@ async function requestRuntimeMessage(message) {
 
 function updatePrototypeButton() {
   if (!prototypeButton) return;
-  const first = Array.isArray(latestState?.items) ? latestState.items[0] : null;
-  const transferred = !!first && first.key === prototypeTransferredKey;
-  prototypeButton.disabled = !first || transferred;
-  prototypeButton.textContent = !first ? '転送対象なし' : transferred ? 'EDIへ転送済み（試作）' : 'EDIへ1件転送（試作）';
+  const target = Array.isArray(latestState?.items) ? latestState.items.find(item => EdiFormat.isEdiQr(item.qr)) : null;
+  const transferred = !!target && target.key === prototypeTransferredKey;
+  prototypeButton.disabled = !target || transferred;
+  prototypeButton.textContent = !target ? 'EDI転送対象なし' : transferred ? 'EDIへ転送済み（試作）' : 'EDIへ1件転送（試作）';
 }
 
 function installPrototypeControls() {
@@ -53,7 +53,7 @@ function installPrototypeControls() {
     try {
       const response = await requestRuntimeMessage({type:'TRANSFER_FIRST_QR'});
       if (!response?.ok) throw Error(response?.error || '転送できませんでした。');
-      prototypeTransferredKey = String(latestState?.items?.[0]?.key || '');
+      prototypeTransferredKey = String(response.key || '');
       prototypeStatus.textContent = `EDIの${response.index}件目へ転送しました。EDI画面でEnterキーを押してください。`;
     } catch (error) {
       prototypeStatus.textContent = error.message;
@@ -70,12 +70,12 @@ function installPrototypeControls() {
 window.addEventListener('message',event => {
   if (event.source !== window || event.origin !== location.origin || event.data?.source !== 'miyama-order-completion') return;
   if (event.data.type === 'pending-state') {
-    const previousFirstKey = String(latestState?.items?.[0]?.key || '');
+    const previousFirstKey = String(latestState?.items?.find(item => EdiFormat.isEdiQr(item.qr))?.key || '');
     latestState = {
       company:event.data.company,
       items:event.data.items
     };
-    const nextFirstKey = String(latestState?.items?.[0]?.key || '');
+    const nextFirstKey = String(latestState?.items?.find(item => EdiFormat.isEdiQr(item.qr))?.key || '');
     if (nextFirstKey !== previousFirstKey && nextFirstKey !== prototypeTransferredKey) prototypeTransferredKey = '';
     sendRuntimeMessage({type:'COMPLETION_STATE',...latestState});
     updatePrototypeButton();

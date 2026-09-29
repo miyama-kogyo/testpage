@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ミヤマ 完納・EDI連携",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "トヨタWG共通EDIで読み取った明細QRを完納処理待ちへ連携します。",
   "permissions": ["tabs", "storage"],
   "host_permissions": [
@@ -18,7 +18,7 @@
         "https://miyama-kogyo.github.io/testpage/order_completion.html*",
         "https://motsu922.github.io/testpage/order_completion.html*"
       ],
-      "js": ["completion.js"],
+      "js": ["edi_format.js", "completion.js"],
       "run_at": "document_start"
     },
     {

@@ -1,5 +1,7 @@
 'use strict';
 
+importScripts('edi_format.js');
+
 const completionTabs = new Map();
 const pairKey = completionTabId => `workspace_pair_${completionTabId}`;
 
@@ -119,8 +121,8 @@ async function transferFirstQr(completionTabId) {
     await refreshCompletionStates();
     state = completionTabs.get(completionTabId);
   }
-  const item = state?.items?.[0];
-  if (!item) throw Error('転送できる完納処理待ちQRがありません。');
+  const item = state?.items?.find(candidate => EdiFormat.isEdiQr(candidate.qr));
+  if (!item) throw Error('EDI対象の完納処理待ちQRがありません（[)> で始まるQRのみ転送します）。');
   const paired = await pairedEdiTab(completionTabId);
   const pairedIsQrPage = paired && isQrPageUrl(paired.url);
   let ediTab = pairedIsQrPage ? paired : null;
@@ -137,7 +139,7 @@ async function transferFirstQr(completionTabId) {
     qr:item.qr
   });
   if (!response?.ok) throw Error(response?.error || 'EDIへ転送できませんでした。');
-  return {ok:true,index:response.index};
+  return {ok:true,index:response.index,key:item.key};
 }
 
 chrome.runtime.onMessage.addListener((message,sender,sendResponse) => {
