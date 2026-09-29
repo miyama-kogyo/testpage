@@ -1,17 +1,41 @@
 'use strict';
 
 const completionTabs = new Map();
+const pairKey = completionTabId => `workspace_pair_${completionTabId}`;
 
 function normalizeQr(value) {
   return String(value || '').replace(/[\r\n]+$/g,'');
 }
 
-chrome.tabs.onRemoved.addListener(tabId => completionTabs.delete(tabId));
+chrome.tabs.onRemoved.addListener(tabId => {
+  completionTabs.delete(tabId);
+  chrome.storage.session.remove(pairKey(tabId)).catch(() => {});
+});
 chrome.tabs.onUpdated.addListener((tabId,changeInfo) => {
   if (changeInfo.url && !/^https:\/\/(?:miyama-kogyo\.github\.io\/(?:apps|testpage)|motsu922\.github\.io\/testpage)\/order_completion\.html/i.test(changeInfo.url)) {
     completionTabs.delete(tabId);
   }
 });
+
+async function saveWorkspacePair(completionTabId,ediTabId) {
+  await chrome.storage.session.set({[pairKey(completionTabId)]:ediTabId});
+}
+
+async function pairedEdiTab(completionTabId) {
+  const stored = await chrome.storage.session.get(pairKey(completionTabId));
+  const tabId = Number(stored[pairKey(completionTabId)]);
+  if (!Number.isInteger(tabId)) return null;
+  try { return await chrome.tabs.get(tabId); }
+  catch (_) {
+    await chrome.storage.session.remove(pairKey(completionTabId));
+    return null;
+  }
+}
+
+function isQrPageUrl(value) {
+  try { return /\/outboundQrAll\.do$/i.test(new URL(String(value || '')).pathname); }
+  catch (_) { return false; }
+}
 
 function findMatches(qr) {
   const matches = [];
@@ -75,7 +99,10 @@ async function openWorkspace(tab,bounds) {
   const ediUrl = 'https://www.toyotawg-edi1.jp/400259565-01/login.do?command=executeLogoff';
   await chrome.windows.create({tabId:tab.id,type:'popup',left,top,width:leftWidth,height});
   await chrome.tabs.update(tab.id,{url:completionUrl});
-  await chrome.windows.create({url:ediUrl,type:'popup',left:left+leftWidth+gap,top,width:rightWidth,height});
+  const ediWindow = await chrome.windows.create({url:ediUrl,type:'popup',left:left+leftWidth+gap,top,width:rightWidth,height});
+  const ediTab = ediWindow.tabs?.[0] || (await chrome.tabs.query({windowId:ediWindow.id}))[0];
+  if (!ediTab?.id) throw Error('右側のEDI画面を確認できません。');
+  await saveWorkspacePair(tab.id,ediTab.id);
   return {ok:true};
 }
 
@@ -87,12 +114,18 @@ async function transferFirstQr(completionTabId) {
   }
   const item = state?.items?.[0];
   if (!item) throw Error('転送できる完納処理待ちQRがありません。');
-  const ediTabs = await chrome.tabs.query({url:[
-    'https://www.toyotawg-edi1.jp/*/outboundQrAll.do*',
-    'https://www.toyotawg-edi.jp/*/outboundQrAll.do*'
-  ]});
-  if (ediTabs.length !== 1) throw Error(ediTabs.length ? 'EDIのQR読取画面を1つだけ開いてください。' : 'EDIのQR読取画面を開いてください。');
-  const response = await chrome.tabs.sendMessage(ediTabs[0].id,{
+  const paired = await pairedEdiTab(completionTabId);
+  const pairedIsQrPage = paired && isQrPageUrl(paired.url);
+  let ediTab = pairedIsQrPage ? paired : null;
+  if (!ediTab) {
+    const ediTabs = await chrome.tabs.query({url:[
+      'https://www.toyotawg-edi1.jp/*/outboundQrAll.do*',
+      'https://www.toyotawg-edi.jp/*/outboundQrAll.do*'
+    ]});
+    if (ediTabs.length !== 1) throw Error(ediTabs.length ? `EDIのQR読取画面を特定できません（候補${ediTabs.length}件）。専用ページから2画面を開き直してください。` : 'EDIのQR読取画面を開いてください。');
+    ediTab = ediTabs[0];
+  }
+  const response = await chrome.tabs.sendMessage(ediTab.id,{
     type:'FILL_EDI_QR_PROTOTYPE',
     qr:item.qr
   });
