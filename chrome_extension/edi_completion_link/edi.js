@@ -76,14 +76,14 @@ function fillPrototypeQr(qr) {
   if (!inputs.length) throw Error('EDIのQR入力欄を検出できません。');
   const target = inputs.find(input => !String(input.value || '').trim());
   if (!target) throw Error('EDIのQR入力欄10件がすべて使用中です。');
-  const value = String(qr || '').replace(/[\r\n]+$/g,'');
+  const value = EdiFormat.toKeyboardValue(qr);
   if (!value) throw Error('転送するQRデータがありません。');
   directTransferValues.set(target,value);
   target.scrollIntoView({block:'center'});
   target.focus({preventScroll:true});
   setNativeValue(target,value);
   const index = inputs.indexOf(target)+1;
-  showStatus(`試作転送: ${index}件目へ入力しました。Enterキーを押してください。`,'warn');
+  showStatus(`試作転送: 端末形式へ変換し、${index}件目へ入力しました。Enterキーを押してください。`,'warn');
   return index;
 }
 

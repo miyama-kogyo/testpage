@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ミヤマ 完納・EDI連携",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "トヨタWG共通EDIで読み取った明細QRを完納処理待ちへ連携します。",
   "permissions": ["tabs", "storage"],
   "host_permissions": [
@@ -26,7 +26,7 @@
         "https://www.toyotawg-edi1.jp/*/outboundQrAll.do*",
         "https://www.toyotawg-edi.jp/*/outboundQrAll.do*"
       ],
-      "js": ["edi.js"],
+      "js": ["edi_format.js", "edi.js"],
       "run_at": "document_idle"
     },
     {
