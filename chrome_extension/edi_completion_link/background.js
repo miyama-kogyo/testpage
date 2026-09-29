@@ -3,6 +3,13 @@
 const completionTabs = new Map();
 const pairKey = completionTabId => `workspace_pair_${completionTabId}`;
 
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.tabs.query({url:[
+    'https://miyama-kogyo.github.io/testpage/edi_completion_workspace.html*',
+    'https://motsu922.github.io/testpage/edi_completion_workspace.html*'
+  ]}).then(tabs => Promise.all(tabs.map(tab => tab.id ? chrome.tabs.reload(tab.id) : null))).catch(() => {});
+});
+
 function normalizeQr(value) {
   return String(value || '').replace(/[\r\n]+$/g,'');
 }

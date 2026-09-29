@@ -12,6 +12,7 @@ button.addEventListener('click',async () => {
   status.textContent = '2画面を準備しています…';
   status.className = 'status working';
   try {
+    if (!chrome.runtime?.id) throw Error('拡張機能が更新されています。このページを再読み込みしてください。');
     const response = await chrome.runtime.sendMessage({
       type:'OPEN_WORKSPACE',
       bounds:{left:screen.availLeft,top:screen.availTop,width:screen.availWidth,height:screen.availHeight}
