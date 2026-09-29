@@ -72,7 +72,7 @@ async function openWorkspace(tab,bounds) {
   const leftWidth = Math.floor((width-gap)/2);
   const rightWidth = width-gap-leftWidth;
   const completionUrl = 'https://miyama-kogyo.github.io/testpage/order_completion.html';
-  const ediUrl = 'https://www.toyotawg-edi.jp/400259565-01/outboundQrAll.do?command=executeInit&ViewAllMode=1';
+  const ediUrl = 'https://www.toyotawg-edi1.jp/400259565-01/login.do?command=executeLogoff';
   await chrome.windows.create({tabId:tab.id,type:'popup',left,top,width:leftWidth,height});
   await chrome.tabs.update(tab.id,{url:completionUrl});
   await chrome.windows.create({url:ediUrl,type:'popup',left:left+leftWidth+gap,top,width:rightWidth,height});
@@ -87,7 +87,10 @@ async function transferFirstQr(completionTabId) {
   }
   const item = state?.items?.[0];
   if (!item) throw Error('転送できる完納処理待ちQRがありません。');
-  const ediTabs = await chrome.tabs.query({url:'https://www.toyotawg-edi.jp/*/outboundQrAll.do*'});
+  const ediTabs = await chrome.tabs.query({url:[
+    'https://www.toyotawg-edi1.jp/*/outboundQrAll.do*',
+    'https://www.toyotawg-edi.jp/*/outboundQrAll.do*'
+  ]});
   if (ediTabs.length !== 1) throw Error(ediTabs.length ? 'EDIのQR読取画面を1つだけ開いてください。' : 'EDIのQR読取画面を開いてください。');
   const response = await chrome.tabs.sendMessage(ediTabs[0].id,{
     type:'FILL_EDI_QR_PROTOTYPE',
