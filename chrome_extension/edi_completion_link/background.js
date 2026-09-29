@@ -115,13 +115,14 @@ async function openWorkspace(tab,bounds) {
   return {ok:true};
 }
 
-async function transferFirstQr(completionTabId) {
+async function transferQr(completionTabId,requestedKey = '') {
   let state = completionTabs.get(completionTabId);
   if (!state?.items?.length) {
     await refreshCompletionStates();
     state = completionTabs.get(completionTabId);
   }
-  const item = state?.items?.find(candidate => EdiFormat.isEdiQr(candidate.qr));
+  const item = state?.items?.find(candidate =>
+    (!requestedKey || candidate.key === requestedKey) && EdiFormat.isEdiQr(candidate.qr));
   if (!item) throw Error('EDI対象の完納処理待ちQRがありません（[)> で始まるQRのみ転送します）。');
   const paired = await pairedEdiTab(completionTabId);
   const pairedIsQrPage = paired && isQrPageUrl(paired.url);
@@ -168,7 +169,11 @@ chrome.runtime.onMessage.addListener((message,sender,sendResponse) => {
     return true;
   }
   if (message?.type === 'TRANSFER_FIRST_QR') {
-    transferFirstQr(tabId).then(sendResponse).catch(error => sendResponse({ok:false,error:error.message}));
+    transferQr(tabId).then(sendResponse).catch(error => sendResponse({ok:false,error:error.message}));
+    return true;
+  }
+  if (message?.type === 'TRANSFER_QR') {
+    transferQr(tabId,String(message.key || '')).then(sendResponse).catch(error => sendResponse({ok:false,error:error.message}));
     return true;
   }
   return false;

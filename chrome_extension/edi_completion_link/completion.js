@@ -67,6 +67,35 @@ function installPrototypeControls() {
   updatePrototypeButton();
 }
 
+async function transferClickedQr(button) {
+  const item = button.closest('.qr-item');
+  const key = String(item?.dataset.key || '');
+  if (!key || item?.dataset.mode !== 'pending') return;
+  if (!prototypeStatus) installPrototypeControls();
+  prototypeStatus.textContent = 'クリックしたQRをEDIへ転送しています…';
+  prototypeStatus.style.color = '#536777';
+  try {
+    const response = await requestRuntimeMessage({type:'TRANSFER_QR',key});
+    if (!response?.ok) throw Error(response?.error || '転送できませんでした。');
+    prototypeTransferredKey = String(response.key || key);
+    prototypeStatus.textContent = `EDIの${response.index}件目へ転送しました。内容確認後にEnterキーを押してください。`;
+  } catch (error) {
+    prototypeStatus.textContent = error.message;
+    prototypeStatus.style.color = '#a52a20';
+  } finally {
+    updatePrototypeButton();
+  }
+}
+
+document.addEventListener('click',event => {
+  const button = event.target.closest?.('.qr-button');
+  const item = button?.closest('.qr-item');
+  if (!button || item?.dataset.mode !== 'pending') return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  transferClickedQr(button);
+},true);
+
 window.addEventListener('message',event => {
   if (event.source !== window || event.origin !== location.origin || event.data?.source !== 'miyama-order-completion') return;
   if (event.data.type === 'pending-state') {
