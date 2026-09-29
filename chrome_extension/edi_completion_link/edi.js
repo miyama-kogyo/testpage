@@ -67,14 +67,6 @@ function setNativeValue(input,value) {
   else input.value = value;
 }
 
-function enterEvent(type) {
-  const event = new KeyboardEvent(type,{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true,cancelable:true});
-  if (event.keyCode !== 13) {
-    try { Object.defineProperties(event,{keyCode:{get:() => 13},which:{get:() => 13}}); } catch (_) {}
-  }
-  return event;
-}
-
 function isDirectTransfer(input) {
   return directTransferValues.get(input) === String(input?.value || '').replace(/[\r\n]+$/g,'');
 }
@@ -90,16 +82,8 @@ function fillPrototypeQr(qr) {
   target.scrollIntoView({block:'center'});
   target.focus({preventScroll:true});
   setNativeValue(target,value);
-  let inputEvent;
-  try { inputEvent = new InputEvent('input',{bubbles:true,inputType:'insertText',data:value}); }
-  catch (_) { inputEvent = new Event('input',{bubbles:true}); }
-  target.dispatchEvent(inputEvent);
-  target.dispatchEvent(new Event('change',{bubbles:true}));
-  target.dispatchEvent(enterEvent('keydown'));
-  target.dispatchEvent(enterEvent('keypress'));
-  target.dispatchEvent(enterEvent('keyup'));
   const index = inputs.indexOf(target)+1;
-  showStatus(`試作転送: ${index}件目へ入力しました。EDIの読取結果を確認してください。`,'warn');
+  showStatus(`試作転送: ${index}件目へ入力しました。Enterキーを押してください。`,'warn');
   return index;
 }
 

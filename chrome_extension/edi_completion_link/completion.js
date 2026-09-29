@@ -54,7 +54,7 @@ function installPrototypeControls() {
       const response = await requestRuntimeMessage({type:'TRANSFER_FIRST_QR'});
       if (!response?.ok) throw Error(response?.error || '転送できませんでした。');
       prototypeTransferredKey = String(latestState?.items?.[0]?.key || '');
-      prototypeStatus.textContent = `EDIの${response.index}件目へ転送しました。読取結果を確認してください。`;
+      prototypeStatus.textContent = `EDIの${response.index}件目へ転送しました。EDI画面でEnterキーを押してください。`;
     } catch (error) {
       prototypeStatus.textContent = error.message;
       prototypeStatus.style.color = '#a52a20';
