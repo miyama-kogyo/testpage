@@ -54,7 +54,7 @@ function installPrototypeControls() {
       const response = await requestRuntimeMessage({type:'TRANSFER_FIRST_QR'});
       if (!response?.ok) throw Error(response?.error || '転送できませんでした。');
       prototypeTransferredKey = String(response.key || '');
-      prototypeStatus.textContent = `EDIの${response.index}件目へ転送しました。EDI画面でEnterキーを押してください。`;
+      prototypeStatus.textContent = `EDIの${response.index}件目へ転送しました。読取情報を確認し、「出荷案内実行」を押してください。`;
     } catch (error) {
       prototypeStatus.textContent = error.message;
       prototypeStatus.style.color = '#a52a20';
@@ -78,7 +78,7 @@ async function transferClickedQr(button) {
     const response = await requestRuntimeMessage({type:'TRANSFER_QR',key});
     if (!response?.ok) throw Error(response?.error || '転送できませんでした。');
     prototypeTransferredKey = String(response.key || key);
-    prototypeStatus.textContent = `EDIの${response.index}件目へ転送しました。内容確認後にEnterキーを押してください。`;
+    prototypeStatus.textContent = `EDIの${response.index}件目へ転送しました。読取情報を確認し、「出荷案内実行」を押してください。`;
   } catch (error) {
     prototypeStatus.textContent = error.message;
     prototypeStatus.style.color = '#a52a20';

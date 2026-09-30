@@ -83,7 +83,7 @@ function fillPrototypeQr(qr) {
   target.focus({preventScroll:true});
   setNativeValue(target,value);
   const index = inputs.indexOf(target)+1;
-  showStatus(`試作転送: 9項目の推測形式へ変換し、${index}件目へ入力しました。内容確認後にEnterキーを押してください。`,'warn');
+  showStatus(`試作転送: ${index}件目へ入力しました。読取情報を確認し、「出荷案内実行」を押してください。`,'warn');
   return index;
 }
 

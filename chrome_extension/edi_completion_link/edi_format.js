@@ -27,11 +27,14 @@
   function toKeyboardValue(rawQr) {
     if (!isEdiQr(rawQr)) throw Error('EDI対象外です（QRが [)> で始まっていません）。');
     const fields = parseHeaderFields(rawQr);
+    const destination = String(fields['2L'] || '');
+    const destinationCompany = destination.slice(0,10).trim();
+    const destinationPlant = destination.slice(10,15).trim();
     const values = [
-      fields['6V'], fields['11V'], fields['20L'], fields['2L'], fields['1L'],
-      fields['16D'], fields['10K'], fields['9D'], fields['9K']
+      fields['6V'], fields['11V'], destinationCompany, destinationPlant, fields['1L'],
+      fields['16D'], fields['10K'], fields['9D'], fields['20L']
     ].map(value => String(value || '').replace(/:/g,''));
-    if (!values[0] || !values[3] || !values[5] || !values[6]) {
+    if (!values[0] || !values[2] || !values[5] || !values[6]) {
       throw Error('EDI変換に必要な企業・納入先・納入指示日・納品書番号が不足しています。');
     }
     return values.join(':');
