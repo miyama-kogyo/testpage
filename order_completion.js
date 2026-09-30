@@ -13,6 +13,7 @@ let activeBatchKeys = [];
 const completionBatchSize = 10;
 const completionBridgeSource = 'miyama-order-completion';
 const receipts = new Map(), known = new Set(), saving = new Set();
+const transferredKeys = new Set();
 function message(text = '') { $('message').textContent = text; }
 function ymd(value) { const s = String(value || ''); return /^\d{8}$/.test(s) ? `${s.slice(0,4)}/${s.slice(4,6)}/${s.slice(6)}` : s || '-'; }
 function destination(item) {
@@ -20,7 +21,7 @@ function destination(item) {
   const name = m.destinationName || m.deliveryName || master[item.customerId] || m.customerName || item.customerId;
   return [name, m.destinationCode, m.receivingCode].filter(Boolean).join(' / ') || '未設定';
 }
-function pending(item) { return known.has(item.key) && receipts.get(item.key)?.status !== 'posted'; }
+function pending(item) { return known.has(item.key) && receipts.get(item.key)?.status !== 'posted' && !transferredKeys.has(item.key); }
 function publishCompletionState(batch) {
   window.postMessage({
     source:completionBridgeSource,
@@ -123,7 +124,7 @@ async function load() {
   const serial = ++generation;
   const includeIncomplete = $('showIncomplete').checked;
   $('dateLabel').textContent = includeIncomplete ? '明細更新日・開始' : '照合完了日・開始';
-  query?.off(); detachReceipts(); items = []; receipts.clear(); known.clear(); loadedCompany = company; replayKey = ''; activeBatchKeys = [];
+  query?.off(); detachReceipts(); items = []; receipts.clear(); known.clear(); transferredKeys.clear(); loadedCompany = company; replayKey = ''; activeBatchKeys = [];
   render(); message('明細を取得しています…');
   try {
     const names = await db.ref(`qr_match_companies/customer_name_master/${company}`).once('value');
@@ -140,7 +141,8 @@ async function load() {
         if (serial !== generation || update !== revision) return;
         const unique = new Map();
         keyed.sort((a,b) => Date.parse(b.completedAt)-Date.parse(a.completedAt)).forEach(item => { if (!unique.has(item.key)) unique.set(item.key,item); });
-        items = [...unique.values()]; detachReceipts(); receipts.clear(); known.clear(); render(); message();
+        items = [...unique.values()].filter(item => CompletionCore.isEdiQr(item.qr));
+        detachReceipts(); receipts.clear(); known.clear(); render(); message();
         for (const item of items) {
           const ref = receiptRef(item.key); receiptRefs.push(ref);
           ref.on('value',snapshot => {
@@ -192,7 +194,16 @@ async function post(key,method = 'qr_click') {
 }
 window.addEventListener('message',async event => {
   const request = event.data;
-  if (event.source !== window || event.origin !== location.origin || request?.source !== 'miyama-edi-link' || request.type !== 'mark-posted') return;
+  if (event.source !== window || event.origin !== location.origin || request?.source !== 'miyama-edi-link') return;
+  if (request.type === 'hide-transferred') {
+    const key = String(request.key || '');
+    if (items.some(item => item.key === key && CompletionCore.isEdiQr(item.qr))) {
+      transferredKeys.add(key);
+      render();
+    }
+    return;
+  }
+  if (request.type !== 'mark-posted') return;
   const item = items.find(candidate => candidate.key === request.key && candidate.qr === request.qr && !candidate.reason && pending(candidate));
   const ok = !!item && await post(item.key,'edi_link');
   window.postMessage({

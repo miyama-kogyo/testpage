@@ -1,6 +1,12 @@
 (function(root) {
   'use strict';
   const values = value => Array.isArray(value) ? value : Object.values(value || {});
+  function isEdiQr(rawQr) {
+    const raw = String(rawQr || '');
+    if (!raw.startsWith('[)>')) return false;
+    const header = raw.replace(/[\r\n]/g,'').split('\x1e').find(segment => /^06\x1d6V/.test(segment)) || '';
+    return !!header && /\x1d2L/.test(header) && /\x1d16D/.test(header) && /\x1d10K/.test(header);
+  }
   function documents(session, sessionId) {
     const lines = values(session.lines);
     const allComplete = lines.length > 0 && lines.every(line =>
@@ -43,7 +49,7 @@
     if (prior.status === 'posted') return undefined;
     return { ...prior, ...context.document, status:'posted', postedAt:context.at, updatedAt:context.at, method:context.method || 'qr_click' };
   }
-  const core = { documents, transition };
+  const core = { documents, transition, isEdiQr };
   if (typeof module !== 'undefined' && module.exports) module.exports = core;
   else root.CompletionCore = core;
 })(typeof window === 'undefined' ? globalThis : window);

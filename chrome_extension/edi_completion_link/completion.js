@@ -25,6 +25,14 @@ async function requestRuntimeMessage(message) {
   }
 }
 
+function hideTransferredQr(key) {
+  window.postMessage({
+    source:'miyama-edi-link',
+    type:'hide-transferred',
+    key:String(key || '')
+  },location.origin);
+}
+
 function updatePrototypeButton() {
   if (!prototypeButton) return;
   const target = Array.isArray(latestState?.items) ? latestState.items.find(item => EdiFormat.isEdiQr(item.qr)) : null;
@@ -54,6 +62,7 @@ function installPrototypeControls() {
       const response = await requestRuntimeMessage({type:'TRANSFER_FIRST_QR'});
       if (!response?.ok) throw Error(response?.error || '転送できませんでした。');
       prototypeTransferredKey = String(response.key || '');
+      hideTransferredQr(prototypeTransferredKey);
       prototypeStatus.textContent = `EDIの${response.index}件目へ転送しました。読取情報を確認し、「出荷案内実行」を押してください。`;
     } catch (error) {
       prototypeStatus.textContent = error.message;
@@ -78,6 +87,7 @@ async function transferClickedQr(button) {
     const response = await requestRuntimeMessage({type:'TRANSFER_QR',key});
     if (!response?.ok) throw Error(response?.error || '転送できませんでした。');
     prototypeTransferredKey = String(response.key || key);
+    hideTransferredQr(prototypeTransferredKey);
     prototypeStatus.textContent = `EDIの${response.index}件目へ転送しました。読取情報を確認し、「出荷案内実行」を押してください。`;
   } catch (error) {
     prototypeStatus.textContent = error.message;
