@@ -24,23 +24,36 @@
     return fields;
   }
 
+  function parseFirstDetailNumber(rawQr) {
+    const segments = String(rawQr || '').replace(/[\r\n]/g,'').split('\x1e');
+    for (const segment of segments) {
+      if (!/^06\x1dK/.test(segment)) continue;
+      const token = segment.split('\x1d').find(value => /^K[0-9A-Z]+/.test(value));
+      if (token) return token.slice(1).trim();
+    }
+    return '';
+  }
+
   function toKeyboardValue(rawQr) {
     if (!isEdiQr(rawQr)) throw Error('EDI対象外です（QRが [)> で始まっていません）。');
     const fields = parseHeaderFields(rawQr);
     const destination = String(fields['2L'] || '');
     const destinationCompany = destination.slice(0,10).trim();
     const destinationPlant = destination.slice(10,15).trim();
+    const deliveryBin = String(fields['9D'] || '').padStart(2,'0').slice(-2);
+    const detailPage = parseFirstDetailNumber(rawQr).slice(0,2).padStart(2,'0');
+    const documentType = String(fields['9K'] || '').slice(0,2);
     const values = [
-      fields['6V'], fields['11V'], destinationCompany, destinationPlant, fields['1L'],
-      fields['16D'], fields['10K'], fields['9D'], fields['20L']
+      destinationCompany, destinationPlant, fields['1L'], fields['6V'], fields['11V'],
+      fields['16D'], fields['10K'], `${deliveryBin}${detailPage}`, documentType
     ].map(value => String(value || '').replace(/:/g,''));
-    if (!values[0] || !values[2] || !values[5] || !values[6]) {
+    if (!values[0] || !values[2] || !values[3] || !values[5] || !values[6] || !values[7] || !values[8]) {
       throw Error('EDI変換に必要な企業・納入先・納入指示日・納品書番号が不足しています。');
     }
     return values.join(':');
   }
 
-  const api = { isEdiQr, parseHeaderFields, toKeyboardValue };
+  const api = { isEdiQr, parseHeaderFields, parseFirstDetailNumber, toKeyboardValue };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.EdiFormat = api;
 })(typeof window === 'undefined' ? globalThis : window);
